@@ -24,7 +24,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "billing:simulate": "tsx scripts/simulate-webhook.ts"
   },
   "dependencies": {
     "@groundline/shared": "workspace:*",
