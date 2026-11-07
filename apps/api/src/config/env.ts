@@ -23,6 +23,11 @@ export const envSchema = z
     SMTP_URL: z.string().default('smtp://localhost:1025'),
     MAIL_FROM: z.string().default('Groundline <no-reply@groundline.local>'),
 
+    // Dodo Payments. Billing endpoints return 503 until the API key is set.
+    DODO_PAYMENTS_API_KEY: z.string().default(''),
+    DODO_PAYMENTS_WEBHOOK_KEY: z.string().default(''),
+    DODO_PAYMENTS_ENVIRONMENT: z.enum(['test_mode', 'live_mode']).default('test_mode'),
+
     INVITATION_TTL_DAYS: z.coerce.number().int().positive().default(7),
   })
   .refine((env) => env.NODE_ENV !== 'production' || env.SUPABASE_JWT_SECRET || env.SUPABASE_ANON_KEY, {

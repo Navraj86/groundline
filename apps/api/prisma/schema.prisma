@@ -46,12 +46,14 @@ model User {
 }
 
 model Organization {
-  id        String   @id @default(uuid(7)) @db.Uuid
-  name      String
-  slug      String   @unique
-  settings  Json     @default("{}")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id             String   @id @default(uuid(7)) @db.Uuid
+  name           String
+  slug           String   @unique
+  settings       Json     @default("{}")
+  // The organization's customer record in Dodo Payments, created at first checkout.
+  dodoCustomerId String?  @unique @map("dodo_customer_id")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   members       OrganizationMember[]
   invitations   Invitation[]
