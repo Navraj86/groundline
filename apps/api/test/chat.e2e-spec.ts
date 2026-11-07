@@ -6,6 +6,7 @@ import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import type { AiClient as AiClientType, AnswerRequest } from '../src/chat/ai-client.service.js';
 import type { PrismaService as PrismaServiceType } from '../src/prisma/prisma.service.js';
+import { ensureFreePlan } from './helpers.js';
 
 process.env.SUPABASE_JWT_SECRET ||= 'e2e-secret-for-signing-test-access-tokens-0123456789';
 
@@ -83,18 +84,7 @@ describe('Chat widget and conversations (e2e)', () => {
     await app.init();
     prisma = app.get(PrismaService);
 
-    await prisma.plan.upsert({
-      where: { key: 'free' },
-      create: {
-        key: 'free',
-        name: 'Free',
-        description: 'Free',
-        priceCents: 0,
-        limits: { members: 2, knowledgeSources: 5, monthlyMessages: 100 },
-        features: [],
-      },
-      update: {},
-    });
+    await ensureFreePlan(prisma);
     const suffix = randomBytes(4).toString('hex');
     const org = await prisma.organization.create({
       data: {

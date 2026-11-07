@@ -5,6 +5,7 @@ import { Webhook } from 'standardwebhooks';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import type { PrismaService as PrismaServiceType } from '../src/prisma/prisma.service.js';
+import { ensureFreePlan } from './helpers.js';
 
 // Must be set before the app module (and its config) is loaded.
 const SECRET = `whsec_${randomBytes(24).toString('base64')}`;
@@ -31,11 +32,7 @@ describe('Dodo Payments webhooks (e2e)', () => {
     await app.init();
     prisma = app.get(PrismaService);
 
-    await prisma.plan.upsert({
-      where: { key: 'free' },
-      create: { key: 'free', name: 'Free', description: 'Free', priceCents: 0, limits: { members: 2 }, features: [] },
-      update: {},
-    });
+    await ensureFreePlan(prisma);
     const plan = await prisma.plan.create({
       data: {
         key: `e2e-${randomBytes(4).toString('hex')}`,
