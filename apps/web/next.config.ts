@@ -1,9 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
+  // Every dashboard page depends on the signed-in user, so pages render per request.
+  // Cache Components can be revisited once public pages (pricing, docs) grow.
+  poweredByHeader: false,
   turbopack: {
     rules: {
       "*.css": {
