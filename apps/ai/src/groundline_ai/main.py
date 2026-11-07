@@ -6,13 +6,16 @@ API stays the system of record and the only service the web app talks to.
 """
 
 import asyncio
+import hmac
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
+from typing import Annotated
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Header, HTTPException, status
 
 from groundline_ai import __version__
+from groundline_ai.answering import AnswerRequest, AnswerResponse, answer
 from groundline_ai.config import get_settings
 from groundline_ai.db import close_pool, open_pool
 from groundline_ai.ingestion.worker import run_worker
@@ -42,6 +45,27 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="Groundline AI", version=__version__, lifespan=lifespan)
 
 
+def require_service_token(authorization: Annotated[str | None, Header()] = None) -> None:
+    """Internal endpoints are called only by the core API, with a shared bearer token."""
+    settings = get_settings()
+    token = settings.ai_service_token
+    if not token:
+        if settings.environment == "production":
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE, "AI_SERVICE_TOKEN is not configured"
+            )
+        return
+    expected = f"Bearer {token}"
+    if not authorization or not hmac.compare_digest(authorization.encode(), expected.encode()):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid service token")
+
+
 @app.get("/health", tags=["health"])
 def health() -> dict[str, str]:
     return {"status": "ok", "version": __version__, "environment": get_settings().environment}
+
+
+@app.post("/v1/answer", tags=["answers"], dependencies=[Depends(require_service_token)])
+async def create_answer(request: AnswerRequest) -> AnswerResponse:
+    """Answers a customer question from the organization's knowledge base."""
+    return await answer(request, get_settings())
