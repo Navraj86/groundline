@@ -12,9 +12,40 @@ function safeNext(value: string | null, fallback: string): string {
 }
 
 /**
+ * Stores the session from the URL fragment and returns where to go next, or throws with a
+ * message to show. The fragment is cleared from the address bar either way.
+ */
+async function completeSignIn(): Promise<string> {
+  const hash = new URLSearchParams(window.location.hash.slice(1));
+  const query = new URLSearchParams(window.location.search);
+  window.history.replaceState(null, "", window.location.pathname + window.location.search);
+
+  const linkError = hash.get("error_description") ?? query.get("error_description");
+  if (linkError) throw new Error(linkError.replace(/\+/g, " "));
+
+  const accessToken = hash.get("access_token");
+  const refreshToken = hash.get("refresh_token");
+  const expiresAt = hash.get("expires_at");
+  if (!accessToken || !refreshToken || !expiresAt) {
+    throw new Error("This link is missing sign-in details. Try opening it again from your email.");
+  }
+
+  const res = await fetch("/auth/session", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ accessToken, refreshToken, expiresAt }),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { message?: string };
+    throw new Error(body.message ?? "We couldn't sign you in with this link.");
+  }
+  return hash.get("type") === "recovery" ? "/reset-password" : safeNext(query.get("next"), "/dashboard");
+}
+
+/**
  * Landing page for links in auth emails. Supabase Auth verifies the link, then redirects
  * here with the new session in the URL fragment, which only the browser can read. We hand
- * it to our server to store in httpOnly cookies and clear it from the address bar.
+ * it to our server to store in httpOnly cookies.
  */
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -24,34 +55,8 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-
-    const hash = new URLSearchParams(window.location.hash.slice(1));
-    const query = new URLSearchParams(window.location.search);
-    window.history.replaceState(null, "", window.location.pathname + window.location.search);
-
-    const linkError = hash.get("error_description") ?? query.get("error_description");
-    if (linkError) {
-      setError(linkError.replace(/\+/g, " "));
-      return;
-    }
-
-    const accessToken = hash.get("access_token");
-    const refreshToken = hash.get("refresh_token");
-    const expiresAt = hash.get("expires_at");
-    if (!accessToken || !refreshToken || !expiresAt) {
-      setError("This link is missing sign-in details. Try opening it again from your email.");
-      return;
-    }
-
-    const next = hash.get("type") === "recovery" ? "/reset-password" : safeNext(query.get("next"), "/dashboard");
-
-    fetch("/auth/session", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ accessToken, refreshToken, expiresAt }),
-    })
-      .then(async (res) => {
-        if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { message?: string }).message);
+    completeSignIn()
+      .then((next) => {
         router.replace(next);
         router.refresh();
       })

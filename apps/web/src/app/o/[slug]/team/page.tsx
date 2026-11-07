@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api } from "@/lib/api";
 import { requireOrg } from "@/lib/auth";
-import { formatDate, initials } from "@/lib/format";
+import { formatDate, initials, isPast } from "@/lib/format";
 import { PageBody, PageHeader } from "../_components/page-header";
 import { InviteDialog } from "./invite-dialog";
 import { InvitationActions, RemoveMemberButton, RoleSelect } from "./member-actions";
@@ -30,7 +30,6 @@ export default async function TeamPage({ params }: PageProps<"/o/[slug]/team">) 
     canManage ? api<Invitation[]>(`/orgs/${org.id}/invitations`) : Promise.resolve([]),
   ]);
   const roles = assignableRoles(org.role);
-  const now = Date.now();
 
   return (
     <>
@@ -127,7 +126,7 @@ export default async function TeamPage({ params }: PageProps<"/o/[slug]/team">) 
                   </TableHeader>
                   <TableBody>
                     {invitations.map((inv) => {
-                      const expired = new Date(inv.expiresAt).getTime() <= now;
+                      const expired = isPast(inv.expiresAt);
                       return (
                         <TableRow key={inv.id}>
                           <TableCell className="font-medium">{inv.email}</TableCell>

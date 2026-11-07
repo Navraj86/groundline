@@ -13,6 +13,8 @@ const relativeFmt = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 export const formatDate = (iso: string) => dateFmt.format(new Date(iso));
 export const formatDateTime = (iso: string) => dateTimeFmt.format(new Date(iso));
 
+export const isPast = (iso: string) => new Date(iso).getTime() <= Date.now();
+
 export function formatRelative(iso: string, now = Date.now()): string {
   const seconds = Math.round((new Date(iso).getTime() - now) / 1000);
   const units: [Intl.RelativeTimeFormatUnit, number][] = [
