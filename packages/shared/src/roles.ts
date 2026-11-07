@@ -41,6 +41,9 @@ export const PERMISSIONS = {
   'conversations:reply': STAFF,
   'assistant:manage': MANAGERS,
   'tickets:manage': STAFF,
+  'approvals:read': STAFF,
+  'approvals:decide': MANAGERS,
+  'agent:read': STAFF,
   'analytics:read': ALL,
   'integrations:manage': ['OWNER'],
 } as const satisfies Record<string, readonly OrgRole[]>;

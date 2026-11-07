@@ -15,6 +15,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { EntitlementsService, PlanLimitException } from '../billing/entitlements.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { TicketsService } from '../tickets/tickets.service.js';
 import { AiClient } from './ai-client.service.js';
 import { readAssistantSettings } from './assistant.service.js';
 
@@ -35,6 +36,7 @@ export class ChatService {
     private readonly ai: AiClient,
     private readonly entitlements: EntitlementsService,
     private readonly audit: AuditService,
+    private readonly tickets: TicketsService,
   ) {}
 
   // ---- Widget (customer-facing) ----------------------------------------------------
@@ -104,6 +106,20 @@ export class ChatService {
         });
         if (input.note) {
           await tx.message.create({ data: { conversationId, organizationId, role: 'CUSTOMER', content: input.note } });
+        }
+        // Workflow 7.6: the handoff becomes a ticket with the conversation attached.
+        if (!(await this.tickets.openForConversation(organizationId, conversationId, tx))) {
+          await this.tickets.create(
+            organizationId,
+            {
+              subject: conversation.title ?? 'Customer asked to talk to a person',
+              description: input.note ?? null,
+              source: 'CUSTOMER',
+              conversationId,
+              customerId: conversation.customerId,
+            },
+            tx,
+          );
         }
         await this.audit.record(
           {

@@ -14,6 +14,7 @@ import { AppMailModule } from './mail/mail.config.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { StorageModule } from './storage/storage.module.js';
+import { TicketsModule } from './tickets/tickets.module.js';
 import { UsersModule } from './users/users.module.js';
 
 @Module({
@@ -39,6 +40,7 @@ import { UsersModule } from './users/users.module.js';
     InvitationsModule,
     KnowledgeModule,
     ChatModule,
+    TicketsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
