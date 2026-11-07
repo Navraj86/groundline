@@ -76,6 +76,24 @@ services:
       GOTRUE_PASSWORD_MIN_LENGTH: 8
       GOTRUE_LOG_LEVEL: info
 
+  # S3-compatible object storage for uploaded knowledge files. Production uses AWS S3.
+  # Console: http://localhost:9001
+  storage:
+    image: rustfs/rustfs:1.0.4
+    restart: unless-stopped
+    environment:
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY:-groundline}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_KEY:-groundline-dev-secret}
+    ports:
+      - "${S3_PORT:-9000}:9000"
+      - "${S3_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - storage-data:/data
+
   # Catches every email sent in development. Inbox UI: http://localhost:8025
   mailpit:
     image: axllent/mailpit:v1.27
@@ -90,3 +108,4 @@ services:
 volumes:
   db-data:
   redis-data:
+  storage-data:
