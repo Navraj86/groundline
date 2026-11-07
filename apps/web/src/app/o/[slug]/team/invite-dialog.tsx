@@ -1,6 +1,7 @@
 "use client";
 
 import { MailPlus } from "lucide-react";
+import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ROLE_DESCRIPTIONS, ROLE_LABELS, type OrgRole } from "@groundline/shared";
@@ -78,7 +79,14 @@ function InviteForm({
       <input type="hidden" name="role" value={role} />
       {state.error && (
         <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
+          <AlertDescription>
+            {state.error}
+            {state.code === "plan_limit_reached" && (
+              <Link href={`/o/${slug}/billing`} className="font-medium underline underline-offset-4">
+                View plans
+              </Link>
+            )}
+          </AlertDescription>
         </Alert>
       )}
       <FieldGroup>

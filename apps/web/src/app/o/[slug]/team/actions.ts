@@ -10,7 +10,7 @@ import { formValues, zodFieldErrors, type FormState } from "@/lib/forms";
 const ids = z.object({ orgId: z.uuid(), slug: z.string().min(1) });
 
 function toState(err: unknown): FormState {
-  if (err instanceof ApiError) return { error: err.message, fieldErrors: err.fieldErrors };
+  if (err instanceof ApiError) return { error: err.message, code: err.body.code, fieldErrors: err.fieldErrors };
   throw err;
 }
 
