@@ -53,9 +53,13 @@ model Organization {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  members     OrganizationMember[]
-  invitations Invitation[]
-  auditLogs   AuditLog[]
+  members       OrganizationMember[]
+  invitations   Invitation[]
+  auditLogs     AuditLog[]
+  subscription  Subscription?
+  payments      Payment[]
+  paymentEvents PaymentEvent[]
+  usage         UsageCounter[]
 
   @@map("organizations")
 }
@@ -118,4 +122,137 @@ model AuditLog {
 
   @@index([organizationId, createdAt(sort: Desc)])
   @@map("audit_logs")
+}
+
+// ---- Billing -------------------------------------------------------------------
+//
+// Payments are processed by Dodo Payments. Our records are a projection of the provider's
+// state, updated only from verified webhook events (or an explicit reconciliation fetch).
+
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+  PAST_DUE
+  ON_HOLD
+  PAUSED
+  CANCELLED
+  FAILED
+  EXPIRED
+}
+
+enum PaymentEventStatus {
+  RECEIVED
+  PROCESSED
+  IGNORED
+  FAILED
+}
+
+// Sellable plans. Limits and prices are data so they can change without a deploy.
+model Plan {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  key           String   @unique
+  name          String
+  description   String
+  // Price per billing interval in the smallest currency unit (cents).
+  priceCents    Int      @map("price_cents")
+  currency      String   @default("USD")
+  interval      String   @default("month")
+  // The matching subscription product in Dodo Payments; null for free plans.
+  dodoProductId String?  @unique @map("dodo_product_id")
+  // { members, knowledgeSources, monthlyMessages }; -1 means unlimited.
+  limits        Json
+  features      String[]
+  isPublic      Boolean  @default(true) @map("is_public")
+  isActive      Boolean  @default(true) @map("is_active")
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+// The organization's current paid subscription. Organizations without one are on the free plan.
+model Subscription {
+  id                 String             @id @default(uuid(7)) @db.Uuid
+  organizationId     String             @unique @map("organization_id") @db.Uuid
+  planId             String             @map("plan_id") @db.Uuid
+  status             SubscriptionStatus
+  dodoSubscriptionId String?            @unique @map("dodo_subscription_id")
+  dodoCustomerId     String?            @map("dodo_customer_id")
+  currentPeriodStart DateTime?          @map("current_period_start") @db.Timestamptz(6)
+  currentPeriodEnd   DateTime?          @map("current_period_end") @db.Timestamptz(6)
+  cancelAtPeriodEnd  Boolean            @default(false) @map("cancel_at_period_end")
+  cancelledAt        DateTime?          @map("cancelled_at") @db.Timestamptz(6)
+  pastDueEndsAt      DateTime?          @map("past_due_ends_at") @db.Timestamptz(6)
+  // Provider timestamp of the newest event applied, so late, out-of-order events are skipped.
+  lastEventAt        DateTime?          @map("last_event_at") @db.Timestamptz(6)
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         Plan         @relation(fields: [planId], references: [id])
+
+  @@index([dodoCustomerId])
+  @@map("subscriptions")
+}
+
+// Charges recorded from payment webhooks: the organization's transaction history.
+model Payment {
+  id                 String    @id @default(uuid(7)) @db.Uuid
+  organizationId     String    @map("organization_id") @db.Uuid
+  dodoPaymentId      String    @unique @map("dodo_payment_id")
+  dodoSubscriptionId String?   @map("dodo_subscription_id")
+  amountCents        Int       @map("amount_cents")
+  currency           String
+  status             String
+  chargeType         String?   @map("charge_type")
+  invoiceUrl         String?   @map("invoice_url")
+  providerCreatedAt  DateTime  @map("provider_created_at") @db.Timestamptz(6)
+  lastEventAt        DateTime? @map("last_event_at") @db.Timestamptz(6)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, providerCreatedAt(sort: Desc)])
+  @@map("payments")
+}
+
+// Every verified webhook delivery, keyed by its webhook-id for idempotency (BR-011).
+model PaymentEvent {
+  id                 String             @id @default(uuid(7)) @db.Uuid
+  webhookId          String             @unique @map("webhook_id")
+  type               String
+  organizationId     String?            @map("organization_id") @db.Uuid
+  dodoSubscriptionId String?            @map("dodo_subscription_id")
+  dodoPaymentId      String?            @map("dodo_payment_id")
+  occurredAt         DateTime           @map("occurred_at") @db.Timestamptz(6)
+  payload            Json
+  status             PaymentEventStatus @default(RECEIVED)
+  error              String?
+  attempts           Int                @default(1)
+  processedAt        DateTime?          @map("processed_at") @db.Timestamptz(6)
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, occurredAt(sort: Desc)])
+  @@index([status])
+  @@map("payment_events")
+}
+
+// Metered usage per organization and calendar month, checked against plan limits.
+model UsageCounter {
+  organizationId String   @map("organization_id") @db.Uuid
+  metric         String
+  periodStart    DateTime @map("period_start") @db.Date
+  count          Int      @default(0)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, metric, periodStart])
+  @@map("usage_counters")
 }
