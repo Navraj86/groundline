@@ -1,0 +1,27 @@
+node_modules/
+dist/
+.next/
+.turbo/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+apps/api/src/generated/
+apps/api/var/
+# Python
+__pycache__/
+.venv/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+# Local tool/assistant config files written by framework dev servers
+AGENTS.md
+CLAUDE.md
+.claude/

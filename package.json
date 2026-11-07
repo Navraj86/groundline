@@ -1,0 +1,25 @@
+{
+  "name": "groundline",
+  "private": true,
+  "description": "Groundline: an AI customer support and operations platform with answers grounded in each company's own knowledge.",
+  "packageManager": "pnpm@10.10.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "infra:logs": "docker compose logs -f",
+    "db:migrate": "pnpm --filter @groundline/api db:migrate",
+    "db:studio": "pnpm --filter @groundline/api db:studio"
+  },
+  "devDependencies": {
+    "turbo": "2.11.10",
+    "typescript": "~6.0.2"
+  }
+}
