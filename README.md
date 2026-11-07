@@ -15,7 +15,7 @@ Built in phases (see the roadmap in the requirements doc).
 | Phase | Scope | Status |
 | --- | --- | --- |
 | 1 | Auth, organizations, roles, invitations, dashboard, database foundation | ✅ Done |
-| 2 | Subscriptions and Dodo Payments | Planned |
+| 2 | Subscriptions, plan limits and Dodo Payments | ✅ Done |
 | 3 | Knowledge-base ingestion, embeddings, RAG chat widget | Planned |
 | 4 | Tickets, agent tool calling, human approval | Planned |
 | 5 | Analytics, evaluations, background workers | Planned |
@@ -39,7 +39,7 @@ Built in phases (see the roadmap in the requirements doc).
 | Path | What it is |
 | --- | --- |
 | `apps/web` | Next.js App Router frontend: landing page, auth flows, workspace dashboard. Talks only to the API, from the server. |
-| `apps/api` | NestJS core API: auth (proxying Supabase Auth), organizations, members, invitations, audit log. System of record. |
+| `apps/api` | NestJS core API: auth (proxying Supabase Auth), organizations, members, invitations, billing, audit log. System of record. |
 | `apps/ai` | Python FastAPI service for AI workloads (ingestion, RAG, agents). Scaffolded; filled in from Phase 3. |
 | `packages/shared` | Roles, permissions, zod schemas and API types shared by web and API. |
 | `infra` | Database init scripts for the local Docker stack. |
@@ -60,6 +60,11 @@ Built in phases (see the roadmap in the requirements doc).
 - **Invitations are bearer secrets.** Tokens are random 256-bit values, stored only as SHA-256
   hashes, single-use, expiring, and bound to the invited email address.
 
+- **Billing state is a projection of the payment provider.** Subscriptions and payments change
+  only from verified Dodo Payments webhooks (or an explicit reconciliation fetch). Each delivery
+  is stored by `webhook-id` and applied in the same transaction that marks it processed, so
+  retries and replays take effect once; events older than the state already applied are skipped.
+
 ### Roles
 
 | Role | Can |
@@ -71,6 +76,45 @@ Built in phases (see the roadmap in the requirements doc).
 
 Admins can't grant, change or remove the Owner role, and a workspace always keeps at least one owner.
 
+## Billing
+
+Plans live in the `plans` table (seeded by `pnpm db:seed`) with their prices, limits and Dodo
+Payments product ids, so they can change without a deploy.
+
+| Plan | Price | Team members | Knowledge sources | AI conversations / month |
+| --- | --- | --- | --- | --- |
+| Free | $0 | 2 | 5 | 100 |
+| Starter | $29 | 5 | 50 | 2,000 |
+| Growth | $99 | 20 | 500 | 10,000 |
+
+- **Checkout:** owners pick a plan; the API creates the workspace's Dodo customer, then a hosted
+  checkout carrying the organization id in metadata. On return, the web app asks the API to
+  reconcile so the new plan shows even before the webhook lands.
+- **Changes:** upgrades and downgrades call Dodo's change-plan API (`difference_immediately`,
+  keeping the old plan if the charge fails). Switching to Free cancels at period end.
+- **Limits:** `EntitlementsService` applies the paid plan while the subscription is active or in
+  its grace period (`PAST_DUE`) and Free otherwise. Exceeding a limit returns `402` with
+  `code: "plan_limit_reached"`. Pending invitations count as seats.
+
+### Setting up Dodo Payments
+
+1. In the Dodo Payments dashboard (test mode), create two monthly subscription products for
+   Starter and Growth. Set a long subscription period (for example 20 years) with monthly
+   payments so they renew.
+2. Put the API key, webhook secret and product ids in `.env` (see `.env.example`), then run
+   `pnpm db:seed` to attach the products to the plans.
+3. Expose the API (for example `cloudflared tunnel --url http://localhost:4000`) and add
+   `<tunnel>/webhooks/dodo` as a webhook endpoint.
+
+Without an account, you can still exercise every billing state locally with signed simulated
+webhooks:
+
+```bash
+DODO_PRODUCT_STARTER=pdt_local_starter DODO_PRODUCT_GROWTH=pdt_local_growth pnpm db:seed
+pnpm --filter @groundline/api billing:simulate <org-slug> activate starter
+pnpm --filter @groundline/api billing:simulate <org-slug> past-due
+```
+
 ## Getting started
 
 Requirements: Node.js 24+, pnpm 10, Docker, and [uv](https://docs.astral.sh/uv/) for the AI service.
@@ -80,6 +124,7 @@ pnpm install
 cp .env.example .env    # then set SUPABASE_JWT_SECRET and AUTH_DB_PASSWORD
 pnpm infra:up           # Postgres, Redis, Supabase Auth, Mailpit
 pnpm db:migrate         # apply Prisma migrations
+pnpm --filter @groundline/api db:seed   # plan catalog
 pnpm dev                # web :3000, api :4000, ai :8000
 ```
 
@@ -123,3 +168,8 @@ pnpm db:studio    # browse the database with Prisma Studio
 | `GET/POST/DELETE` | `/orgs/:orgId/invitations[/:id]` | `members:manage` |
 | `GET` | `/invitations/:token` | Public preview |
 | `POST` | `/invitations/:token/accept` | Must be signed in as the invited email |
+| `GET` | `/plans` | Public plan catalog |
+| `GET` | `/orgs/:orgId/billing`, `/orgs/:orgId/billing/payments` | `billing:read` |
+| `POST` | `/orgs/:orgId/billing/checkout`, `/change-plan`, `/cancel`, `/resume`, `/portal` | `billing:manage` (owners) |
+| `POST` | `/orgs/:orgId/billing/sync` | Reconcile with Dodo Payments |
+| `POST` | `/webhooks/dodo` | Signature-verified, idempotent |
