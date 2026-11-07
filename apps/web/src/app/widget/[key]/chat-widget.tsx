@@ -11,7 +11,7 @@ import type {
   WidgetSession,
 } from "@groundline/shared";
 import { cn } from "@/lib/utils";
-import { renderAnswer } from "./render-answer";
+import { renderAnswer } from "@/components/render-answer";
 
 type Session = { conversationId: string; token: string };
 type Pending = { id: string; content: string };
