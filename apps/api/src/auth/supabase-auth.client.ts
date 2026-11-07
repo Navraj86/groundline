@@ -61,10 +61,15 @@ export class SupabaseAuthClient {
     return `${this.webUrl}/auth/callback?next=${encodeURIComponent(next)}`;
   }
 
-  async signUp(email: string, password: string, fullName: string): Promise<AuthSession | null> {
+  async signUp(
+    email: string,
+    password: string,
+    fullName: string,
+    next = '/onboarding',
+  ): Promise<AuthSession | null> {
     const body = await this.request<GoTrueSession | GoTrueUser>('/signup', {
       method: 'POST',
-      query: { redirect_to: this.callbackUrl('/onboarding') },
+      query: { redirect_to: this.callbackUrl(next) },
       body: { email, password, data: { full_name: fullName } },
     });
     // With email confirmation enabled GoTrue returns the user without a session.

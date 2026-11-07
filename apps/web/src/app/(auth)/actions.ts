@@ -41,6 +41,7 @@ export async function signUp(_: FormState, formData: FormData): Promise<FormStat
     fullName: formData.get("fullName"),
     email: formData.get("email"),
     password: formData.get("password"),
+    next: safeNext(formData.get("next"), "/onboarding"),
   });
   if (!parsed.success) return { fieldErrors: zodFieldErrors(parsed.error), values };
 

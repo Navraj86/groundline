@@ -35,7 +35,7 @@ export class AuthController {
   @Throttle(STRICT)
   @Post('sign-up')
   async signUp(@Body({ schema: signUpSchema }) body: SignUpInput): Promise<SignUpResult> {
-    const session = await this.supabase.signUp(body.email, body.password, body.fullName);
+    const session = await this.supabase.signUp(body.email, body.password, body.fullName, body.next);
     return { confirmationRequired: session === null, session };
   }
 

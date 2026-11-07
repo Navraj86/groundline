@@ -21,7 +21,13 @@ const slug = z
 
 // ---- Auth ----------------------------------------------------------------------
 
-export const signUpSchema = z.object({ fullName: personName, email, password });
+/** A same-site path to continue to after an email link, e.g. back to an invitation. */
+export const returnPathSchema = z
+  .string()
+  .max(300)
+  .regex(/^\/(?![/\\])/, 'Must be a relative path');
+
+export const signUpSchema = z.object({ fullName: personName, email, password, next: returnPathSchema.optional() });
 export type SignUpInput = z.infer<typeof signUpSchema>;
 
 export const signInSchema = z.object({ email, password: z.string().min(1, 'Enter your password') });
