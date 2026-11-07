@@ -65,14 +65,14 @@ export class EntitlementsService {
   async usage(organizationId: string): Promise<Record<PlanLimitKey, UsageItem>> {
     const { plan } = await this.effectivePlan(organizationId);
     const limits = planLimits(plan);
-    const [members, monthlyMessages] = await Promise.all([
+    const [members, knowledgeSources, monthlyMessages] = await Promise.all([
       this.prisma.organizationMember.count({ where: { organizationId } }),
+      this.prisma.knowledgeSource.count({ where: { organizationId } }),
       this.counter(organizationId, 'monthlyMessages'),
     ]);
     return {
       members: { used: members, limit: limits.members },
-      // Knowledge sources arrive with the knowledge-base module.
-      knowledgeSources: { used: 0, limit: limits.knowledgeSources },
+      knowledgeSources: { used: knowledgeSources, limit: limits.knowledgeSources },
       monthlyMessages: { used: monthlyMessages, limit: limits.monthlyMessages },
     };
   }
@@ -112,6 +112,20 @@ export class EntitlementsService {
         'members',
         limit,
         'This workspace has reached its team size limit. Ask a workspace owner to upgrade the plan.',
+      );
+    }
+  }
+
+  async assertCanAddKnowledgeSource(organizationId: string): Promise<void> {
+    const { plan } = await this.effectivePlan(organizationId);
+    const limit = planLimits(plan).knowledgeSources;
+    if (limit === UNLIMITED) return;
+    const count = await this.prisma.knowledgeSource.count({ where: { organizationId } });
+    if (count >= limit) {
+      throw new PlanLimitException(
+        'knowledgeSources',
+        limit,
+        `Your ${plan.name} plan includes ${limit} knowledge sources. Remove one or upgrade to add more.`,
       );
     }
   }

@@ -28,6 +28,13 @@ export const envSchema = z
     DODO_PAYMENTS_WEBHOOK_KEY: z.string().default(''),
     DODO_PAYMENTS_ENVIRONMENT: z.enum(['test_mode', 'live_mode']).default('test_mode'),
 
+    // S3-compatible object storage. Leave S3_ENDPOINT empty for AWS S3.
+    S3_ENDPOINT: z.string().default('http://localhost:9000'),
+    S3_REGION: z.string().default('us-east-1'),
+    S3_BUCKET: z.string().default('groundline-uploads'),
+    S3_ACCESS_KEY: z.string().default(''),
+    S3_SECRET_KEY: z.string().default(''),
+
     INVITATION_TTL_DAYS: z.coerce.number().int().positive().default(7),
   })
   .refine((env) => env.NODE_ENV !== 'production' || env.SUPABASE_JWT_SECRET || env.SUPABASE_ANON_KEY, {

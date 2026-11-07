@@ -8,9 +8,11 @@ import { BillingModule } from './billing/billing.module.js';
 import { validateEnv } from './config/env.js';
 import { HealthModule } from './health/health.module.js';
 import { InvitationsModule } from './invitations/invitations.module.js';
+import { KnowledgeModule } from './knowledge/knowledge.module.js';
 import { AppMailModule } from './mail/mail.config.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { StorageModule } from './storage/storage.module.js';
 import { UsersModule } from './users/users.module.js';
 
 @Module({
@@ -26,6 +28,7 @@ import { UsersModule } from './users/users.module.js';
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 300 }]),
     PrismaModule,
     AppMailModule,
+    StorageModule,
     AuditModule,
     BillingModule,
     HealthModule,
@@ -33,6 +36,7 @@ import { UsersModule } from './users/users.module.js';
     UsersModule,
     OrganizationsModule,
     InvitationsModule,
+    KnowledgeModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
