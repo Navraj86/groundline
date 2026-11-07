@@ -4,8 +4,8 @@
   "private": true,
   "description": "Python AI service, wired into the workspace scripts via uv",
   "scripts": {
-    "dev": "uv run fastapi dev src/groundline_ai/main.py --port 8000",
-    "start": "uv run fastapi run src/groundline_ai/main.py --port 8000",
+    "dev": "uv run python -m groundline_ai.server --reload",
+    "start": "uv run python -m groundline_ai.server --host 0.0.0.0",
     "lint": "uv run ruff check . && uv run ruff format --check .",
     "test": "uv run pytest -q"
   }

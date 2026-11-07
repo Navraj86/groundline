@@ -17,3 +17,10 @@ def run[T](coro: Coroutine[Any, Any, T]) -> T:
             coro, loop_factory=lambda: asyncio.SelectorEventLoop(selectors.SelectSelector())
         )
     return asyncio.run(coro)
+
+
+def selector_loop() -> asyncio.AbstractEventLoop:
+    """Loop factory for uvicorn (`loop="groundline_ai.aio:selector_loop"`)."""
+    if sys.platform == "win32":
+        return asyncio.SelectorEventLoop(selectors.SelectSelector())
+    return asyncio.new_event_loop()
