@@ -56,7 +56,6 @@ services:
       GOTRUE_JWT_SECRET: ${SUPABASE_JWT_SECRET:?SUPABASE_JWT_SECRET must be set in .env}
       GOTRUE_JWT_EXP: 3600
       GOTRUE_JWT_AUD: authenticated
-      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
       GOTRUE_JWT_ADMIN_ROLES: service_role
       GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
       GOTRUE_MAILER_AUTOCONFIRM: "false"
@@ -69,8 +68,6 @@ services:
       GOTRUE_MAILER_SUBJECTS_RECOVERY: "Reset your Groundline password"
       GOTRUE_SMTP_HOST: mailpit
       GOTRUE_SMTP_PORT: 1025
-      GOTRUE_SMTP_USER: dev
-      GOTRUE_SMTP_PASS: dev
       GOTRUE_SMTP_ADMIN_EMAIL: no-reply@groundline.local
       GOTRUE_SMTP_SENDER_NAME: Groundline
       GOTRUE_RATE_LIMIT_EMAIL_SENT: 1000
