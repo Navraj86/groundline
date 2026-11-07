@@ -42,6 +42,10 @@ model User {
   invitationsAccepted Invitation[]         @relation("AcceptedBy")
   auditLogs           AuditLog[]
   knowledgeSources    KnowledgeSource[]
+  ticketsAssigned     Ticket[]             @relation("TicketAssignee")
+  ticketsCreated      Ticket[]             @relation("TicketCreator")
+  ticketEvents        TicketEvent[]
+  approvalsDecided    ApprovalRequest[]
 
   @@map("users")
 }
@@ -55,6 +59,10 @@ model Organization {
   dodoCustomerId String?  @unique @map("dodo_customer_id")
   // Public key that identifies the organization to the embeddable chat widget.
   widgetKey      String?  @unique @map("widget_key")
+  // Secret the organization's site signs visitor identity tokens with (encrypted at rest).
+  identitySecret String?  @map("identity_secret")
+  // Last ticket number issued; tickets are numbered per organization.
+  ticketSeq      Int      @default(1000) @map("ticket_seq")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -68,6 +76,13 @@ model Organization {
   knowledge     KnowledgeSource[]
   conversations Conversation[]
   messages      Message[]
+  customers     Customer[]
+  tickets       Ticket[]
+  ticketEvents  TicketEvent[]
+  agentRuns     AgentRun[]
+  toolCalls     ToolCall[]
+  approvals     ApprovalRequest[]
+  integrations  Integration[]
 
   @@map("organizations")
 }
@@ -349,6 +364,8 @@ model Conversation {
   visitorId      String              @map("visitor_id")
   visitorName    String?             @map("visitor_name")
   visitorEmail   String?             @map("visitor_email")
+  // Set when the visitor's identity was verified with a token signed by the organization.
+  customerId     String?             @map("customer_id") @db.Uuid
   title          String?
   // Set once the AI has answered at least once, for the monthly conversation limit.
   aiEngagedAt    DateTime?           @map("ai_engaged_at") @db.Timestamptz(6)
@@ -358,8 +375,13 @@ model Conversation {
   createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
   messages     Message[]
+  tickets      Ticket[]
+  agentRuns    AgentRun[]
+  toolCalls    ToolCall[]
+  approvals    ApprovalRequest[]
 
   @@index([organizationId, lastMessageAt(sort: Desc)])
   @@index([organizationId, status])
@@ -389,4 +411,235 @@ model Message {
   @@index([conversationId, createdAt])
   @@index([organizationId, createdAt])
   @@map("messages")
+}
+
+// ---- Customers ----------------------------------------------------------------------
+
+// End customers of an organization, known from verified widget identity tokens.
+model Customer {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  // The customer's id in the organization's own system (the token's `sub`).
+  externalId     String   @map("external_id")
+  email          String?
+  name           String?
+  attributes     Json     @default("{}")
+  lastSeenAt     DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+  tickets       Ticket[]
+
+  @@unique([organizationId, externalId])
+  @@map("customers")
+}
+
+// ---- Tickets ------------------------------------------------------------------------
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum TicketSource {
+  AI
+  CUSTOMER
+  AGENT
+}
+
+model Ticket {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  // Human-friendly number, unique within the organization.
+  number         Int
+  subject        String
+  description    String?
+  status         TicketStatus   @default(OPEN)
+  priority       TicketPriority @default(NORMAL)
+  source         TicketSource
+  conversationId String?        @map("conversation_id") @db.Uuid
+  customerId     String?        @map("customer_id") @db.Uuid
+  assigneeId     String?        @map("assignee_id") @db.Uuid
+  createdById    String?        @map("created_by_id") @db.Uuid
+  resolvedAt     DateTime?      @map("resolved_at") @db.Timestamptz(6)
+  closedAt       DateTime?      @map("closed_at") @db.Timestamptz(6)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversation Conversation?     @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  customer     Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  assignee     User?             @relation("TicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  createdBy    User?             @relation("TicketCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  events       TicketEvent[]
+  approvals    ApprovalRequest[]
+
+  @@unique([organizationId, number])
+  @@index([organizationId, status, updatedAt(sort: Desc)])
+  @@index([assigneeId, status])
+  @@index([conversationId])
+  @@map("tickets")
+}
+
+enum TicketEventType {
+  CREATED
+  STATUS_CHANGED
+  PRIORITY_CHANGED
+  ASSIGNED
+  NOTE
+}
+
+// Ticket activity history, including internal notes (never shown to customers).
+model TicketEvent {
+  id             String          @id @default(uuid(7)) @db.Uuid
+  ticketId       String          @map("ticket_id") @db.Uuid
+  organizationId String          @map("organization_id") @db.Uuid
+  actorUserId    String?         @map("actor_user_id") @db.Uuid
+  type           TicketEventType
+  // NOTE: { body }. STATUS_CHANGED, PRIORITY_CHANGED, ASSIGNED: { from, to }.
+  data           Json            @default("{}")
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  ticket       Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor        User?        @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, createdAt])
+  @@map("ticket_events")
+}
+
+// ---- Agent tools and approvals ------------------------------------------------------
+
+enum AgentRunStatus {
+  COMPLETED
+  FAILED
+}
+
+// One AI reply, which may take several model steps and tool calls.
+model AgentRun {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  conversationId String         @map("conversation_id") @db.Uuid
+  messageId      String?        @unique @map("message_id") @db.Uuid
+  status         AgentRunStatus
+  steps          Int
+  provider       String?
+  model          String?
+  inputTokens    Int            @default(0) @map("input_tokens")
+  outputTokens   Int            @default(0) @map("output_tokens")
+  latencyMs      Int            @map("latency_ms")
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  toolCalls    ToolCall[]
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("agent_runs")
+}
+
+enum ToolCallStatus {
+  SUCCEEDED
+  FAILED
+  // Refused before running: unknown or disabled tool, invalid input, no verified customer.
+  BLOCKED
+  PENDING_APPROVAL
+  REJECTED
+}
+
+// Every tool the agent asked to run, with input, outcome and timing (FR-053).
+model ToolCall {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  agentRunId     String?        @map("agent_run_id") @db.Uuid
+  conversationId String?        @map("conversation_id") @db.Uuid
+  tool           String
+  input          Json
+  output         Json?
+  status         ToolCallStatus
+  sensitive      Boolean        @default(false)
+  error          String?
+  durationMs     Int?           @map("duration_ms")
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt    DateTime?      @map("completed_at") @db.Timestamptz(6)
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agentRun     AgentRun?        @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
+  conversation Conversation?    @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  approval     ApprovalRequest?
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([conversationId, createdAt])
+  @@map("tool_calls")
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+// A sensitive action waiting for a person to approve it (FR-054, BR-007).
+model ApprovalRequest {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  toolCallId     String         @unique @map("tool_call_id") @db.Uuid
+  conversationId String?        @map("conversation_id") @db.Uuid
+  ticketId       String?        @map("ticket_id") @db.Uuid
+  status         ApprovalStatus @default(PENDING)
+  // What will happen if approved, in plain words.
+  summary        String
+  decidedById    String?        @map("decided_by_id") @db.Uuid
+  decidedAt      DateTime?      @map("decided_at") @db.Timestamptz(6)
+  decisionNote   String?        @map("decision_note")
+  expiresAt      DateTime       @map("expires_at") @db.Timestamptz(6)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  toolCall     ToolCall      @relation(fields: [toolCallId], references: [id], onDelete: Cascade)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  ticket       Ticket?       @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  decidedBy    User?         @relation(fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, createdAt(sort: Desc)])
+  @@map("approval_requests")
+}
+
+// ---- Integrations -------------------------------------------------------------------
+
+enum IntegrationKind {
+  // Built-in demo store with realistic fake customers, orders and subscriptions.
+  SANDBOX
+  // The organization's own backend, called with signed HTTP requests.
+  ACTIONS_API
+}
+
+model Integration {
+  id             String          @id @default(uuid(7)) @db.Uuid
+  organizationId String          @map("organization_id") @db.Uuid
+  kind           IntegrationKind
+  enabled        Boolean         @default(true)
+  // ACTIONS_API: { baseUrl }.
+  config         Json            @default("{}")
+  // Request signing secret (encrypted at rest).
+  secret         String?
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, kind])
+  @@map("integrations")
 }
