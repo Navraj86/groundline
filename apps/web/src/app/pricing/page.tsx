@@ -6,6 +6,9 @@ import { PlanCard } from "@/components/plan-card";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 
+// Plans come from the API, which isn't available at build time; render on request.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Pricing",
   description: "Simple monthly plans for Groundline. Start free and upgrade as your support volume grows.",
