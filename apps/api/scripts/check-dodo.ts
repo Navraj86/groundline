@@ -18,7 +18,7 @@ async function main() {
   for (const plan of plans) {
     try {
       const product = await dodo.products.retrieve(plan.dodoProductId!);
-      const price = product.price as Record<string, unknown>;
+      const price = product.price as unknown as Record<string, unknown>;
       const issues: string[] = [];
       if (!product.is_recurring) issues.push('not a subscription product');
       if (price.price !== plan.priceCents) issues.push(`price ${price.price} != plan ${plan.priceCents}`);
