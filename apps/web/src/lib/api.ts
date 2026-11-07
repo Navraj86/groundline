@@ -36,7 +36,9 @@ type ApiOptions = {
 /** Calls the Groundline API from the server. Throws `ApiError` on non-2xx responses. */
 export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   const headers: Record<string, string> = { accept: "application/json" };
-  if (opts.body !== undefined) headers["content-type"] = "application/json";
+  const isForm = opts.body instanceof FormData;
+  // FormData sets its own multipart content type (with the boundary).
+  if (opts.body !== undefined && !isForm) headers["content-type"] = "application/json";
 
   if (opts.auth !== false) {
     const token = opts.token ?? (await getAccessToken());
@@ -48,7 +50,7 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
     res = await fetch(`${API_URL}${path}`, {
       method: opts.method ?? "GET",
       headers,
-      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+      body: opts.body === undefined ? undefined : isForm ? (opts.body as FormData) : JSON.stringify(opts.body),
       cache: "no-store",
     });
   } catch {

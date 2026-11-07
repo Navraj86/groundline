@@ -4,6 +4,7 @@ import {
   Activity,
   BarChart3,
   BookOpen,
+  Bot,
   Check,
   ChevronsUpDown,
   CreditCard,
@@ -57,8 +58,9 @@ type NavItem = {
 
 const supportNav: NavItem[] = [
   { title: "Overview", href: "", icon: LayoutDashboard },
-  { title: "Knowledge base", href: "/knowledge", icon: BookOpen, permission: "knowledge:read", soon: true },
-  { title: "Conversations", href: "/conversations", icon: MessagesSquare, permission: "conversations:read", soon: true },
+  { title: "Knowledge base", href: "/knowledge", icon: BookOpen, permission: "knowledge:read" },
+  { title: "Conversations", href: "/conversations", icon: MessagesSquare, permission: "conversations:read" },
+  { title: "Assistant", href: "/assistant", icon: Bot, permission: "knowledge:read" },
   { title: "Tickets", href: "/tickets", icon: Ticket, permission: "tickets:manage", soon: true },
   { title: "Analytics", href: "/analytics", icon: BarChart3, permission: "analytics:read", soon: true },
 ];
