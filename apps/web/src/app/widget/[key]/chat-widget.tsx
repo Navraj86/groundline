@@ -180,7 +180,7 @@ export function ChatWidget({
             {status === "ESCALATED" ? `Chatting with the ${config.organizationName} team` : config.organizationName}
           </p>
         </div>
-        {embedded && (
+        {embedded && !preview && (
           <button
             type="button"
             aria-label="Close chat"
