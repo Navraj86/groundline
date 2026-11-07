@@ -38,6 +38,8 @@ export const PERMISSIONS = {
   'knowledge:read': STAFF,
   'knowledge:manage': MANAGERS,
   'conversations:read': STAFF,
+  'conversations:reply': STAFF,
+  'assistant:manage': MANAGERS,
   'tickets:manage': STAFF,
   'analytics:read': ALL,
   'integrations:manage': ['OWNER'],

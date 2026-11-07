@@ -35,10 +35,21 @@ export const envSchema = z
     S3_ACCESS_KEY: z.string().default(''),
     S3_SECRET_KEY: z.string().default(''),
 
+    // Internal AI service (retrieval and answers).
+    AI_SERVICE_URL: z.url().default('http://localhost:8000'),
+    AI_SERVICE_TOKEN: z.string().default(''),
+    // Signs widget visitor tokens. Required in production.
+    WIDGET_TOKEN_SECRET: z.string().default(''),
+    // Express "trust proxy" setting, so rate limits see the real client IP behind the web app.
+    TRUST_PROXY: z.string().default('loopback'),
+
     INVITATION_TTL_DAYS: z.coerce.number().int().positive().default(7),
   })
   .refine((env) => env.NODE_ENV !== 'production' || env.SUPABASE_JWT_SECRET || env.SUPABASE_ANON_KEY, {
     message: 'Set SUPABASE_JWT_SECRET or SUPABASE_ANON_KEY in production',
+  })
+  .refine((env) => env.NODE_ENV !== 'production' || env.WIDGET_TOKEN_SECRET.length >= 32, {
+    message: 'Set WIDGET_TOKEN_SECRET (at least 32 characters) in production',
   });
 
 export type Env = z.infer<typeof envSchema>;
