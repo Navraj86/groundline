@@ -19,7 +19,7 @@ export default async function OverviewPage({ params }: PageProps<"/o/[slug]">) {
   const firstName = me.fullName?.split(" ")[0];
 
   const stats = [
-    { label: "Team members", value: overview.members, icon: Users, hint: `${overview.pendingInvitations} pending invitations` },
+    { label: "Team members", value: overview.members, icon: Users, hint: plural(overview.pendingInvitations, "pending invitation") },
     { label: "Knowledge sources", value: overview.knowledgeSources, icon: BookOpen, hint: "Documents and URLs" },
     { label: "Conversations", value: overview.conversations, icon: MessagesSquare, hint: "Last 30 days" },
     { label: "Open tickets", value: overview.openTickets, icon: Ticket, hint: "Escalated to your team" },
@@ -123,4 +123,8 @@ export default async function OverviewPage({ params }: PageProps<"/o/[slug]">) {
       </PageBody>
     </>
   );
+}
+
+function plural(n: number, word: string) {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
