@@ -23,9 +23,11 @@ describe('Dodo Payments webhooks (e2e)', () => {
 
   beforeAll(async () => {
     const { AppModule } = await import('../src/app.module.js');
+    const { configureApp } = await import('../src/app.setup.js');
     const { PrismaService } = await import('../src/prisma/prisma.service.js');
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication({ rawBody: true });
+    configureApp(app);
     await app.init();
     prisma = app.get(PrismaService);
 
