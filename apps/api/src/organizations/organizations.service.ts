@@ -105,9 +105,16 @@ export class OrganizationsService {
 
   async overview(organizationId: string, role: OrgRole): Promise<OrganizationOverview> {
     const now = new Date();
-    const [members, pendingInvitations, recent] = await Promise.all([
+    const since = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const [members, pendingInvitations, knowledgeSources, conversations, needsHuman, recent] = await Promise.all([
       this.prisma.organizationMember.count({ where: { organizationId } }),
       this.prisma.invitation.count({ where: { organizationId, status: 'PENDING', expiresAt: { gt: now } } }),
+      this.prisma.knowledgeSource.count({ where: { organizationId, status: 'READY' } }),
+      this.prisma.conversation.count({
+        where: { organizationId, channel: 'WIDGET', createdAt: { gte: since }, messages: { some: {} } },
+      }),
+      // Escalated conversations stand in for open tickets until the ticketing module lands.
+      this.prisma.conversation.count({ where: { organizationId, status: 'ESCALATED' } }),
       hasPermission(role, 'audit:read')
         ? this.prisma.auditLog.findMany({
             where: { organizationId },
@@ -120,9 +127,9 @@ export class OrganizationsService {
     return {
       members,
       pendingInvitations,
-      knowledgeSources: 0,
-      conversations: 0,
-      openTickets: 0,
+      knowledgeSources,
+      conversations,
+      openTickets: needsHuman,
       recentActivity: recent.map(toEntry),
     };
   }

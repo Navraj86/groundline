@@ -1,4 +1,4 @@
-import { BookOpen, CheckCircle2, Circle, MailPlus, MessagesSquare, Ticket, Users } from "lucide-react";
+import { ArrowRight, BookOpen, CheckCircle2, Circle, MessagesSquare, Ticket, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { hasPermission, type OrganizationOverview } from "@groundline/shared";
@@ -20,9 +20,9 @@ export default async function OverviewPage({ params }: PageProps<"/o/[slug]">) {
 
   const stats = [
     { label: "Team members", value: overview.members, icon: Users, hint: plural(overview.pendingInvitations, "pending invitation") },
-    { label: "Knowledge sources", value: overview.knowledgeSources, icon: BookOpen, hint: "Documents and URLs" },
+    { label: "Knowledge sources", value: overview.knowledgeSources, icon: BookOpen, hint: "Ready for the assistant" },
     { label: "Conversations", value: overview.conversations, icon: MessagesSquare, hint: "Last 30 days" },
-    { label: "Open tickets", value: overview.openTickets, icon: Ticket, hint: "Escalated to your team" },
+    { label: "Needs a human", value: overview.openTickets, icon: Ticket, hint: "Escalated conversations" },
   ];
 
   const steps = [
@@ -37,11 +37,15 @@ export default async function OverviewPage({ params }: PageProps<"/o/[slug]">) {
       done: overview.knowledgeSources > 0,
       title: "Add your knowledge base",
       description: "Upload help-center articles, policies and product docs for the AI agent to learn from.",
+      action: hasPermission(org.role, "knowledge:manage")
+        ? { label: "Add knowledge", href: `${base}/knowledge` }
+        : undefined,
     },
     {
       done: overview.conversations > 0,
       title: "Install the chat widget",
       description: "Embed the support assistant on your website with one script tag.",
+      action: { label: "Get the snippet", href: `${base}/assistant` },
     },
   ];
   const completed = steps.filter((s) => s.done).length;
@@ -93,7 +97,7 @@ export default async function OverviewPage({ params }: PageProps<"/o/[slug]">) {
                       {!step.done && step.action && (
                         <Button asChild size="sm" variant="outline" className="mt-2">
                           <Link href={step.action.href}>
-                            <MailPlus /> {step.action.label}
+                            {step.action.label} <ArrowRight />
                           </Link>
                         </Button>
                       )}
