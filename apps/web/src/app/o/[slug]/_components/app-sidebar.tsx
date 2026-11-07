@@ -6,6 +6,7 @@ import {
   BookOpen,
   Check,
   ChevronsUpDown,
+  CreditCard,
   LayoutDashboard,
   LogOut,
   MessagesSquare,
@@ -64,6 +65,7 @@ const supportNav: NavItem[] = [
 
 const workspaceNav: NavItem[] = [
   { title: "Team", href: "/team", icon: Users, permission: "members:read" },
+  { title: "Billing", href: "/billing", icon: CreditCard, permission: "billing:read" },
   { title: "Activity", href: "/activity", icon: Activity, permission: "audit:read" },
   { title: "Settings", href: "/settings", icon: Settings },
 ];

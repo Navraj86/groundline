@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { hasPermission, type Organization } from "@groundline/shared";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/api";
 import { requireOrg } from "@/lib/auth";
@@ -32,14 +34,19 @@ export default async function SettingsPage({ params }: PageProps<"/o/[slug]/sett
             <OrgSettingsForm orgId={org.id} name={org.name} slug={org.slug} canEdit={canEdit} />
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Billing</CardTitle>
-            <CardDescription>
-              Plans, usage limits and invoices will live here once subscriptions launch.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+        {hasPermission(org.role, "billing:read") && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Billing</CardTitle>
+              <CardDescription>Manage your plan, usage and invoices.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="outline">
+                <Link href={`/o/${org.slug}/billing`}>Go to billing</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
       </PageBody>
     </>
   );
