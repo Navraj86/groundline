@@ -56,6 +56,8 @@ services:
       GOTRUE_JWT_SECRET: ${SUPABASE_JWT_SECRET:?SUPABASE_JWT_SECRET must be set in .env}
       GOTRUE_JWT_EXP: 3600
       GOTRUE_JWT_AUD: authenticated
+      # Logs a deprecation notice, but it is still what puts role=authenticated in access tokens.
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
       GOTRUE_JWT_ADMIN_ROLES: service_role
       GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
       GOTRUE_MAILER_AUTOCONFIRM: "false"
