@@ -16,7 +16,7 @@ Built in phases (see the roadmap in the requirements doc).
 | --- | --- | --- |
 | 1 | Auth, organizations, roles, invitations, dashboard, database foundation | ✅ Done |
 | 2 | Subscriptions, plan limits and Dodo Payments | ✅ Done |
-| 3 | Knowledge-base ingestion, embeddings, RAG chat widget | Planned |
+| 3 | Knowledge-base ingestion, embeddings, RAG chat widget | ✅ Done |
 | 4 | Tickets, agent tool calling, human approval | Planned |
 | 5 | Analytics, evaluations, background workers | Planned |
 | 6 | Docker images, CI/CD, AWS deployment | In progress (CI) |
@@ -31,16 +31,17 @@ Built in phases (see the roadmap in the requirements doc).
                                                         └──────┬───────┘──▶ SMTP
                                                                │
                                                         ┌──────▼───────┐
-                                                        │  apps/ai     │  ingestion, retrieval,
-                                                        │  FastAPI     │  LLM + agent orchestration
-                                                        └──────────────┘
+                                                        │  apps/ai     │──▶ OpenAI (answers, embeddings)
+                                                        │  FastAPI     │──▶ DeepSeek (answer fallback)
+                                                        └──────────────┘──▶ S3 (uploaded files)
+ customer site ──▶ widget.js ──▶ iframe /widget/[key] ──▶ /api/widget/* ──▶ apps/api /widget/*
 ```
 
 | Path | What it is |
 | --- | --- |
 | `apps/web` | Next.js App Router frontend: landing page, auth flows, workspace dashboard. Talks only to the API, from the server. |
 | `apps/api` | NestJS core API: auth (proxying Supabase Auth), organizations, members, invitations, billing, audit log. System of record. |
-| `apps/ai` | Python FastAPI service for AI workloads (ingestion, RAG, agents). Scaffolded; filled in from Phase 3. |
+| `apps/ai` | Python FastAPI service: document ingestion worker, pgvector retrieval, grounded answers with OpenAI (DeepSeek fallback). |
 | `packages/shared` | Roles, permissions, zod schemas and API types shared by web and API. |
 | `infra` | Database init scripts for the local Docker stack. |
 
@@ -60,6 +61,17 @@ Built in phases (see the roadmap in the requirements doc).
 - **Invitations are bearer secrets.** Tokens are random 256-bit values, stored only as SHA-256
   hashes, single-use, expiring, and bound to the invited email address.
 
+- **Answers come only from the customer's own knowledge.** Retrieval is scoped to the
+  organization and filtered by relevance. With nothing relevant, the assistant says so and offers
+  a human without calling a model. Sources are passed as fenced, numbered data (instructions inside
+  them are ignored), answers cite them as `[n]`, and the model replies `NO_ANSWER` rather than
+  guessing. Deleting a source cascades its chunks out of retrieval immediately.
+- **Postgres is the ingestion queue.** New sources are claimed with `FOR UPDATE SKIP LOCKED`, the
+  worker wakes on `NOTIFY knowledge_ingest`, chunks are swapped atomically, and temporary failures
+  retry with backoff. Website fetches are checked hop by hop against private addresses (SSRF).
+- **Provider fallback.** Answers go to OpenAI through the Responses API; on outages, rate limits or
+  errors the same request goes to DeepSeek's compatible API. Each reply records provider, model,
+  tokens and latency.
 - **Billing state is a projection of the payment provider.** Subscriptions and payments change
   only from verified Dodo Payments webhooks (or an explicit reconciliation fetch). Each delivery
   is stored by `webhook-id` and applied in the same transaction that marks it processed, so
@@ -75,6 +87,24 @@ Built in phases (see the roadmap in the requirements doc).
 | Viewer | Read dashboards and reports |
 
 Admins can't grant, change or remove the Owner role, and a workspace always keeps at least one owner.
+
+## Knowledge base and chat
+
+1. **Knowledge base:** upload PDFs, text or Markdown (up to 20 MB), add web pages, or paste text.
+   The AI service extracts text, splits it into overlapping ~1,200-character passages, embeds them
+   with `text-embedding-3-small` and stores them in `ai.knowledge_chunks` (pgvector, HNSW).
+2. **Assistant:** set its name, greeting, tone instructions and brand color, then copy the embed
+   snippet:
+
+   ```html
+   <script src="https://your-groundline-host/widget.js" data-groundline-key="wk_..." async></script>
+   ```
+
+3. **Conversations:** every chat is stored with the sources behind each answer. Customers can ask
+   for a person; once a conversation is escalated the AI stops replying and your team answers from
+   the inbox.
+
+Each widget conversation counts once against the plan's monthly AI conversation limit.
 
 ## Billing
 
@@ -118,6 +148,8 @@ pnpm --filter @groundline/api billing:simulate <org-slug> past-due
 ## Getting started
 
 Requirements: Node.js 24+, pnpm 10, Docker, and [uv](https://docs.astral.sh/uv/) for the AI service.
+Answers and embeddings need `OPENAI_API_KEY`; `DEEPSEEK_API_KEY` adds a fallback for answers.
+Without an OpenAI key, run the AI service with `EMBEDDINGS_PROVIDER=fake` to try ingestion locally.
 
 ```bash
 pnpm install
@@ -125,7 +157,7 @@ cp .env.example .env    # then set SUPABASE_JWT_SECRET and AUTH_DB_PASSWORD
 pnpm infra:up           # Postgres, Redis, Supabase Auth, Mailpit
 pnpm db:migrate         # apply Prisma migrations
 pnpm --filter @groundline/api db:seed   # plan catalog
-pnpm dev                # web :3000, api :4000, ai :8000
+pnpm dev                # web :3000, api :4000, ai :8000 (runs its migrations and ingestion worker)
 ```
 
 Generate a JWT secret with:
@@ -141,6 +173,7 @@ node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 | http://localhost:8000/docs | AI service |
 | http://localhost:8025 | Mailpit inbox (confirmation, reset and invitation emails) |
 | http://localhost:9999 | Supabase Auth |
+| http://localhost:9001 | Object storage console (RustFS) |
 
 ### Useful scripts
 
@@ -173,3 +206,8 @@ pnpm db:studio    # browse the database with Prisma Studio
 | `POST` | `/orgs/:orgId/billing/checkout`, `/change-plan`, `/cancel`, `/resume`, `/portal` | `billing:manage` (owners) |
 | `POST` | `/orgs/:orgId/billing/sync` | Reconcile with Dodo Payments |
 | `POST` | `/webhooks/dodo` | Signature-verified, idempotent |
+| `GET/POST/PATCH/DELETE` | `/orgs/:orgId/knowledge[/files\|urls\|text\|:id[/reprocess]]` | Knowledge sources |
+| `GET/PATCH/POST` | `/orgs/:orgId/assistant[/rotate-key]` | Assistant settings and widget key |
+| `GET/POST/PATCH` | `/orgs/:orgId/conversations[/:id[/messages]]` | Inbox, team replies, resolve |
+| `GET/POST` | `/widget/:key`, `/widget/:key/conversations` | Public: config, start a chat |
+| `GET/POST` | `/widget/conversations/:id[/messages\|escalate]` | Public, visitor token required |
