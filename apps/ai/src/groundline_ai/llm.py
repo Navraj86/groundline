@@ -97,7 +97,8 @@ async def complete(
             )
         except _FALLBACK_ERRORS as err:
             status = getattr(err, "status_code", None)
-            level = logging.ERROR if status in (400, 404, 422) else logging.WARNING
+            # Bad keys and malformed requests need fixing; outages and rate limits are transient.
+            level = logging.ERROR if status in (400, 401, 403, 404, 422) else logging.WARNING
             log.log(level, "%s failed (%s): %s", provider.name, status or type(err).__name__, err)
             continue
 
