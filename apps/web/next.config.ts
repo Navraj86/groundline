@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   // Every dashboard page depends on the signed-in user, so pages render per request.
   // Cache Components can be revisited once public pages (pricing, docs) grow.
   poweredByHeader: false,
+  agentRules: false,
   turbopack: {
     rules: {
       "*.css": {
