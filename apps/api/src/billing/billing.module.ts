@@ -6,11 +6,13 @@ import { EntitlementsService } from './entitlements.service.js';
 import { PlansController } from './plans.controller.js';
 import { PlansService } from './plans.service.js';
 import { SubscriptionSyncService } from './subscription-sync.service.js';
+import { WebhookProcessor } from './webhook-processor.service.js';
+import { WebhooksController } from './webhooks.controller.js';
 
 @Global()
 @Module({
-  controllers: [PlansController, BillingController],
-  providers: [PlansService, EntitlementsService, DodoService, SubscriptionSyncService, BillingService],
+  controllers: [PlansController, BillingController, WebhooksController],
+  providers: [PlansService, EntitlementsService, DodoService, SubscriptionSyncService, BillingService, WebhookProcessor],
   exports: [PlansService, EntitlementsService],
 })
 export class BillingModule {}

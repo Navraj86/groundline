@@ -5,7 +5,8 @@ import { AppModule } from './app.module.js';
 import type { Env } from './config/env.js';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // rawBody keeps the exact request bytes, which webhook signatures are computed over.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   const config = app.get<ConfigService<Env, true>>(ConfigService);
 
   app.useGlobalPipes(new StandardSchemaValidationPipe());
