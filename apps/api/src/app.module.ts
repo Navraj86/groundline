@@ -6,6 +6,8 @@ import { AuditModule } from './audit/audit.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { validateEnv } from './config/env.js';
 import { HealthModule } from './health/health.module.js';
+import { InvitationsModule } from './invitations/invitations.module.js';
+import { AppMailModule } from './mail/mail.config.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { UsersModule } from './users/users.module.js';
@@ -22,11 +24,13 @@ import { UsersModule } from './users/users.module.js';
     // Default API rate limit; credential endpoints apply a stricter one.
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 300 }]),
     PrismaModule,
+    AppMailModule,
     AuditModule,
     HealthModule,
     AuthModule,
     UsersModule,
     OrganizationsModule,
+    InvitationsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
