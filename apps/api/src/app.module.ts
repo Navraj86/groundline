@@ -4,6 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuditModule } from './audit/audit.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { BillingModule } from './billing/billing.module.js';
 import { validateEnv } from './config/env.js';
 import { HealthModule } from './health/health.module.js';
 import { InvitationsModule } from './invitations/invitations.module.js';
@@ -26,6 +27,7 @@ import { UsersModule } from './users/users.module.js';
     PrismaModule,
     AppMailModule,
     AuditModule,
+    BillingModule,
     HealthModule,
     AuthModule,
     UsersModule,

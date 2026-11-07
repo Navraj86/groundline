@@ -17,6 +17,7 @@ import {
   type InviteMemberInput,
 } from '@groundline/shared';
 import { AuditService } from '../audit/audit.service.js';
+import { EntitlementsService } from '../billing/entitlements.service.js';
 import type { AuthContext, OrgContext } from '../auth/auth.types.js';
 import type { Env } from '../config/env.js';
 import { Prisma } from '../generated/prisma/client.js';
@@ -44,6 +45,7 @@ export class InvitationsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly mailer: Mailer,
+    private readonly entitlements: EntitlementsService,
     config: ConfigService<Env, true>,
   ) {
     this.webUrl = config.get('WEB_URL', { infer: true });
@@ -73,6 +75,7 @@ export class InvitationsService {
       select: { id: true },
     });
     if (existingMember) throw new ConflictException(`${input.email} is already a member of this organization`);
+    await this.entitlements.assertCanInvite(actor.organizationId, input.email);
 
     const token = randomBytes(32).toString('base64url');
     const expiresAt = new Date(Date.now() + this.ttlMs);
@@ -171,6 +174,11 @@ export class InvitationsService {
           `This invitation was sent to ${invitation.email}. Sign in with that email address to accept it.`,
         );
       }
+
+      const alreadyMember = await tx.organizationMember.findUnique({
+        where: { organizationId_userId: { organizationId: invitation.organizationId, userId: user.userId } },
+      });
+      if (!alreadyMember) await this.entitlements.assertCanJoin(invitation.organizationId, tx);
 
       const membership = await tx.organizationMember.upsert({
         where: { organizationId_userId: { organizationId: invitation.organizationId, userId: user.userId } },
