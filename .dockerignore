@@ -1,0 +1,20 @@
+# Keep build contexts small and free of secrets and local build output.
+.git
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/coverage
+**/*.tsbuildinfo
+**/.env
+**/.env.*
+!.env.example
+*.log
+apps/api/src/generated
+apps/api/var
+apps/ai/.venv
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+deploy/terraform/**/.terraform
+deploy/terraform/**/*.tfstate*

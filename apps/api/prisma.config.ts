@@ -13,6 +13,8 @@ export default defineConfig({
     seed: 'tsx prisma/seed.ts',
   },
   datasource: {
-    url: process.env.DATABASE_URL ?? '',
+    // Migrations can use their own URL: Prisma's migration engine takes TLS options in a
+    // different form from the node-postgres driver the app uses.
+    url: process.env.MIGRATE_DATABASE_URL || process.env.DATABASE_URL || '',
   },
 });
