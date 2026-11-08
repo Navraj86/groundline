@@ -28,6 +28,40 @@ export interface AnswerResult {
   input_tokens: number | null;
   output_tokens: number | null;
   latency_ms: number;
+  prompt_version?: string;
+}
+
+export interface GradeResult {
+  relevance: number;
+  groundedness: number;
+  correctness: number | null;
+  unsupported_claims: string[];
+  notes: string;
+  judge: string;
+  input_tokens: number;
+  output_tokens: number;
+}
+
+export interface EvalCaseRequest extends AnswerRequest {
+  expectedAnswer: string | null;
+  expectedSourceIds: string[];
+  expectInsufficient: boolean;
+}
+
+export interface EvalCaseResult {
+  status: AnswerStatus;
+  answer: string;
+  sources: AnswerResult['sources'];
+  retrieved_source_ids: string[];
+  retrieval_hit: boolean | null;
+  reciprocal_rank: number | null;
+  grade: GradeResult | null;
+  provider: string | null;
+  model: string | null;
+  input_tokens: number;
+  output_tokens: number;
+  latency_ms: number;
+  prompt_version: string;
 }
 
 export interface AgentStepRequest extends AnswerRequest {
@@ -98,6 +132,52 @@ export class AiClient {
         latency_ms: Date.now() - started,
       };
     }
+  }
+
+  /** Grades a live answer against the chunks it cited. Throws on failure, so jobs can retry. */
+  async gradeAnswer(input: {
+    organizationId: string;
+    question: string;
+    answer: string;
+    chunkIds: string[];
+  }): Promise<GradeResult> {
+    return this.post<GradeResult>('/v1/eval/grade', {
+      organization_id: input.organizationId,
+      question: input.question,
+      answer: input.answer,
+      chunk_ids: input.chunkIds,
+    });
+  }
+
+  /** Answers and scores one evaluation case. Throws on failure, so jobs can retry. */
+  async evalCase(request: EvalCaseRequest): Promise<EvalCaseResult> {
+    return this.post<EvalCaseResult>('/v1/eval/case', {
+      organization_id: request.organizationId,
+      question: request.question,
+      history: request.history,
+      assistant: {
+        name: request.assistant.name,
+        company_name: request.assistant.companyName,
+        instructions: request.assistant.instructions,
+      },
+      expected_answer: request.expectedAnswer,
+      expected_source_ids: request.expectedSourceIds,
+      expect_insufficient: request.expectInsufficient,
+    });
+  }
+
+  private async post<T>(path: string, body: unknown): Promise<T> {
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(this.token ? { authorization: `Bearer ${this.token}` } : {}),
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(90_000),
+    });
+    if (!res.ok) throw new Error(`AI service ${path} responded ${res.status}: ${(await res.text()).slice(0, 500)}`);
+    return (await res.json()) as T;
   }
 
   async answer(request: AnswerRequest): Promise<AnswerResult> {

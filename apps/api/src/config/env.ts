@@ -52,6 +52,12 @@ export const envSchema = z
     // 32-byte key (base64) for encrypting stored secrets such as connector signing keys.
     ENCRYPTION_KEY: z.string().default(''),
 
+    // Share of answers (0–1) checked in the background for claims their sources don't support.
+    ANSWER_REVIEW_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.25),
+    // Per-model prices in USD per million tokens, for cost estimates, as JSON:
+    // {"gpt-6.1-sol": {"input": 2, "output": 10}}. Merged over the built-in list.
+    AI_MODEL_PRICES: z.string().default(''),
+
     INVITATION_TTL_DAYS: z.coerce.number().int().positive().default(7),
   })
   .refine((env) => env.NODE_ENV !== 'production' || env.SUPABASE_JWT_SECRET || env.SUPABASE_ANON_KEY, {

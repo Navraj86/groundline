@@ -14,7 +14,22 @@ export interface AnswerSource {
   url: string | null;
   pages: number[];
   snippet: string;
+  /** Knowledge chunk the citation points to. Stored for answer reviews; not sent to the widget. */
+  chunkId?: string;
 }
+
+/** Background check of an answer against the sources it cites. Scores are 0–1. */
+export interface AnswerReview {
+  groundedness: number;
+  relevance: number;
+  unsupportedClaims: string[];
+  notes: string | null;
+  judge: string | null;
+  reviewedAt: string;
+}
+
+/** Answers whose groundedness is below this are flagged as possible hallucinations. */
+export const GROUNDEDNESS_FLAG_THRESHOLD = 0.6;
 
 export interface ChatMessage {
   id: string;
@@ -30,6 +45,7 @@ export interface ChatMessage {
     inputTokens: number | null;
     outputTokens: number | null;
     latencyMs: number | null;
+    review: AnswerReview | null;
   };
 }
 

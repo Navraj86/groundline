@@ -2,7 +2,7 @@ import { ArrowLeft, Bot, ExternalLink, UserRound, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { hasPermission, type ChatMessage, type ConversationDetail, type ToolCallStatus } from "@groundline/shared";
+import { GROUNDEDNESS_FLAG_THRESHOLD, hasPermission, type AnswerReview, type ChatMessage, type ConversationDetail, type ToolCallStatus } from "@groundline/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -186,6 +186,7 @@ function MessageRow({ message }: { message: ChatMessage }) {
           )}
         </div>
         <div className="space-y-2 text-sm leading-relaxed">{renderAnswer(message.content)}</div>
+        {message.meta?.review && <ReviewNote review={message.meta.review} />}
         {message.sources.length > 0 && (
           <div className="space-y-1.5 rounded-lg border bg-muted/30 p-3">
             <p className="text-xs font-medium text-muted-foreground">Sources</p>
@@ -208,6 +209,32 @@ function MessageRow({ message }: { message: ChatMessage }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function ReviewNote({ review }: { review: AnswerReview }) {
+  const flagged = review.groundedness < GROUNDEDNESS_FLAG_THRESHOLD;
+  const pct = (n: number) => `${Math.round(n * 100)}%`;
+  return (
+    <div
+      className={cn(
+        "space-y-1 rounded-lg border p-3 text-xs",
+        flagged ? "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200" : "text-muted-foreground",
+      )}
+    >
+      <p className="font-medium">
+        {flagged ? "Possible unsupported claims" : "Quality check passed"} · grounded {pct(review.groundedness)} · relevant{" "}
+        {pct(review.relevance)}
+      </p>
+      {review.unsupportedClaims.length > 0 && (
+        <ul className="list-disc space-y-0.5 pl-4">
+          {review.unsupportedClaims.map((c) => (
+            <li key={c}>{c}</li>
+          ))}
+        </ul>
+      )}
+      {review.judge && <p className="opacity-70">Reviewed by {review.judge === "heuristic" ? "word-overlap check (no model configured)" : review.judge}</p>}
     </div>
   );
 }

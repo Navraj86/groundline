@@ -20,6 +20,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { TicketsService } from '../tickets/tickets.service.js';
 import { AiClient, type AgentStepRequest, type AgentStepResult } from './ai-client.service.js';
+import { AnswerReviewService } from './answer-review.service.js';
 import { readAssistantSettings } from './assistant.service.js';
 
 const HISTORY_LIMIT = 12;
@@ -46,6 +47,7 @@ export class ChatService {
     private readonly audit: AuditService,
     private readonly tickets: TicketsService,
     private readonly toolExecutor: ToolExecutor,
+    private readonly reviews: AnswerReviewService,
   ) {}
 
   // ---- Widget (customer-facing) ----------------------------------------------------
@@ -323,6 +325,7 @@ export class ChatService {
       url: s.url,
       pages: s.pages,
       snippet: s.snippet,
+      chunkId: s.chunk_id,
     }));
     const latencyMs = Date.now() - started;
     const message = await this.saveReply(conversation, {
@@ -348,8 +351,10 @@ export class ChatService {
         inputTokens: usage.input,
         outputTokens: usage.output,
         latencyMs,
+        promptVersion: result.prompt_version ?? null,
       },
     });
+    await this.reviews.maybeEnqueue(message);
     return message;
   }
 
@@ -427,7 +432,7 @@ function toMessage(row: MessageRow, includeMeta: boolean): ChatMessage {
     role: row.role,
     content: row.content,
     answerStatus: row.answerStatus,
-    sources: (row.sources as unknown as AnswerSource[]) ?? [],
+    sources: ((row.sources as unknown as AnswerSource[]) ?? []).map(({ chunkId: _chunkId, ...source }) => source),
     createdAt: row.createdAt.toISOString(),
     ...(includeMeta
       ? {
@@ -437,6 +442,17 @@ function toMessage(row: MessageRow, includeMeta: boolean): ChatMessage {
             inputTokens: row.inputTokens,
             outputTokens: row.outputTokens,
             latencyMs: row.latencyMs,
+            review:
+              row.reviewedAt && row.groundedness !== null && row.relevance !== null
+                ? {
+                    groundedness: row.groundedness,
+                    relevance: row.relevance,
+                    unsupportedClaims: (row.unsupportedClaims as string[] | null) ?? [],
+                    notes: row.reviewNotes,
+                    judge: row.reviewJudge,
+                    reviewedAt: row.reviewedAt.toISOString(),
+                  }
+                : null,
           },
         }
       : {}),
