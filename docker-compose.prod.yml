@@ -1,0 +1,76 @@
+# The whole Groundline stack from production images, on top of docker-compose.yml's
+# dependencies. Use it to try a production build locally before deploying:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build
+#
+# Open http://localhost:3100. Reads secrets from .env; service addresses point at the
+# containers. In AWS the same images run on ECS (see deploy/terraform).
+
+x-app-env: &app-env
+  NODE_ENV: production
+  DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/groundline
+  REDIS_URL: redis://redis:6379
+  SUPABASE_AUTH_URL: http://auth:9999
+  SMTP_URL: smtp://mailpit:1025
+  S3_ENDPOINT: http://storage:9000
+  AI_SERVICE_URL: http://ai:8000
+  WEB_URL: http://localhost:3100
+
+services:
+  # One-off: applies migrations and seeds plans, then exits. The API waits for it.
+  migrate:
+    build: { context: ., dockerfile: apps/api/Dockerfile, target: migrate }
+    image: groundline-migrate:local
+    env_file: [{ path: .env, required: false }]
+    environment: *app-env
+    depends_on:
+      db: { condition: service_healthy }
+    restart: "no"
+
+  api:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    image: groundline-api:local
+    env_file: [{ path: .env, required: false }]
+    environment:
+      <<: *app-env
+      # Jobs run in the worker service.
+      WORKERS_ENABLED: "false"
+      TRUST_PROXY: "1"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    restart: unless-stopped
+
+  worker:
+    image: groundline-api:local
+    command: ["node", "dist/worker.js"]
+    env_file: [{ path: .env, required: false }]
+    environment: *app-env
+    depends_on:
+      api: { condition: service_started }
+    healthcheck: { disable: true }
+    restart: unless-stopped
+
+  ai:
+    build: { context: ., dockerfile: apps/ai/Dockerfile }
+    image: groundline-ai:local
+    env_file: [{ path: .env, required: false }]
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/groundline
+      S3_ENDPOINT: http://storage:9000
+      ENVIRONMENT: production
+    depends_on:
+      db: { condition: service_healthy }
+    restart: unless-stopped
+
+  web:
+    build: { context: ., dockerfile: apps/web/Dockerfile }
+    image: groundline-web:local
+    environment:
+      API_URL: http://api:4000
+      PUBLIC_WEB_URL: http://localhost:3100
+    ports:
+      - "${WEB_PROD_PORT:-3100}:3000"
+    depends_on:
+      api: { condition: service_healthy }
+    restart: unless-stopped

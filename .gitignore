@@ -26,3 +26,10 @@ AGENTS.md
 CLAUDE.md
 .claude/
 .api.log
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+deploy/terraform/terraform.tfvars
+deploy/terraform/backend.hcl
