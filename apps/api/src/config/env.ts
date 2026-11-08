@@ -43,10 +43,16 @@ export const envSchema = z
     // Express "trust proxy" setting, so rate limits see the real client IP behind the web app.
     TRUST_PROXY: z.string().default('loopback'),
 
+    // 32-byte key (base64) for encrypting stored secrets such as connector signing keys.
+    ENCRYPTION_KEY: z.string().default(''),
+
     INVITATION_TTL_DAYS: z.coerce.number().int().positive().default(7),
   })
   .refine((env) => env.NODE_ENV !== 'production' || env.SUPABASE_JWT_SECRET || env.SUPABASE_ANON_KEY, {
     message: 'Set SUPABASE_JWT_SECRET or SUPABASE_ANON_KEY in production',
+  })
+  .refine((env) => env.NODE_ENV !== 'production' || Buffer.from(env.ENCRYPTION_KEY, 'base64').length === 32, {
+    message: 'Set ENCRYPTION_KEY to 32 random bytes, base64-encoded, in production',
   })
   .refine((env) => env.NODE_ENV !== 'production' || env.WIDGET_TOKEN_SECRET.length >= 32, {
     message: 'Set WIDGET_TOKEN_SECRET (at least 32 characters) in production',

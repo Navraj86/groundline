@@ -10,7 +10,9 @@ import type {
   Paginated,
   SendMessageResult,
   StartConversationInput,
+  ToolCallView,
 } from '@groundline/shared';
+import { toToolCallView } from '../agent/agent.controller.js';
 import { AuditService } from '../audit/audit.service.js';
 import { EntitlementsService, PlanLimitException } from '../billing/entitlements.service.js';
 import { Prisma } from '../generated/prisma/client.js';
@@ -41,17 +43,23 @@ export class ChatService {
 
   // ---- Widget (customer-facing) ----------------------------------------------------
 
-  async start(organizationId: string, input: StartConversationInput): Promise<ConversationDetail> {
+  async start(
+    organizationId: string,
+    input: StartConversationInput,
+    verified?: { customerId: string; email: string | null; name: string | null },
+  ): Promise<ConversationDetail> {
     const conversation = await this.prisma.conversation.create({
       data: {
         organizationId,
         channel: input.channel,
         visitorId: input.visitorId ?? randomUUID(),
-        visitorName: input.name ?? null,
-        visitorEmail: input.email ?? null,
+        // A verified identity wins over anything the visitor typed.
+        visitorName: verified?.name ?? input.name ?? null,
+        visitorEmail: verified?.email ?? input.email ?? null,
+        customerId: verified?.customerId ?? null,
       },
     });
-    return toDetail(conversation, [], { includeMeta: false });
+    return toDetail(conversation, [], { includeMeta: false, pendingApprovals: 0 });
   }
 
   async getForVisitor(organizationId: string, conversationId: string): Promise<ConversationDetail> {
@@ -327,12 +335,18 @@ export class ChatService {
     opts: { includeMeta: boolean },
   ): Promise<ConversationDetail> {
     const conversation = await this.findConversation(organizationId, conversationId);
-    const messages = await this.prisma.message.findMany({
-      where: { conversationId },
-      orderBy: { createdAt: 'asc' },
-      take: 500,
+    const [messages, pendingApprovals, toolCalls] = await Promise.all([
+      this.prisma.message.findMany({ where: { conversationId }, orderBy: { createdAt: 'asc' }, take: 500 }),
+      this.prisma.approvalRequest.count({ where: { conversationId, status: 'PENDING' } }),
+      opts.includeMeta
+        ? this.prisma.toolCall.findMany({ where: { conversationId }, orderBy: { createdAt: 'asc' }, take: 200 })
+        : Promise.resolve([]),
+    ]);
+    return toDetail(conversation, messages, {
+      ...opts,
+      pendingApprovals,
+      toolCalls: opts.includeMeta ? toolCalls.map(toToolCallView) : undefined,
     });
-    return toDetail(conversation, messages, opts);
   }
 }
 
@@ -372,11 +386,18 @@ function toSummary(row: ConversationRow, messageCount: number): Omit<Conversatio
   };
 }
 
-function toDetail(row: ConversationRow, messages: MessageRow[], opts: { includeMeta: boolean }): ConversationDetail {
+function toDetail(
+  row: ConversationRow,
+  messages: MessageRow[],
+  opts: { includeMeta: boolean; pendingApprovals: number; toolCalls?: ToolCallView[] },
+): ConversationDetail {
   const last = messages[messages.length - 1];
   return {
     ...toSummary(row, messages.length),
     lastMessage: last ? { role: last.role, content: last.content } : null,
+    verified: row.customerId !== null,
+    pendingApprovals: opts.pendingApprovals,
+    ...(opts.toolCalls ? { toolCalls: opts.toolCalls } : {}),
     escalatedAt: row.escalatedAt?.toISOString() ?? null,
     resolvedAt: row.resolvedAt?.toISOString() ?? null,
     messages: messages.map((m) => toMessage(m, opts.includeMeta)),

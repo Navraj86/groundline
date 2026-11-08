@@ -2,10 +2,12 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { AgentModule } from './agent/agent.module.js';
 import { AuditModule } from './audit/audit.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { BillingModule } from './billing/billing.module.js';
 import { ChatModule } from './chat/chat.module.js';
+import { CommonModule } from './common/common.module.js';
 import { validateEnv } from './config/env.js';
 import { HealthModule } from './health/health.module.js';
 import { InvitationsModule } from './invitations/invitations.module.js';
@@ -29,6 +31,7 @@ import { UsersModule } from './users/users.module.js';
     // Default API rate limit; credential endpoints apply a stricter one.
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 300 }]),
     PrismaModule,
+    CommonModule,
     AppMailModule,
     StorageModule,
     AuditModule,
@@ -41,6 +44,7 @@ import { UsersModule } from './users/users.module.js';
     KnowledgeModule,
     ChatModule,
     TicketsModule,
+    AgentModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

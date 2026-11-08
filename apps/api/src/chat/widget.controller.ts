@@ -13,6 +13,7 @@ import {
   type WidgetSession,
 } from '@groundline/shared';
 import { z } from 'zod';
+import { IdentityService } from '../agent/identity.service.js';
 import { Public } from '../auth/decorators.js';
 import { AssistantService } from './assistant.service.js';
 import { ChatService } from './chat.service.js';
@@ -32,6 +33,7 @@ export class WidgetController {
     private readonly assistant: AssistantService,
     private readonly chat: ChatService,
     private readonly tokens: WidgetTokenService,
+    private readonly identity: IdentityService,
   ) {}
 
   @Get(':widgetKey')
@@ -47,7 +49,9 @@ export class WidgetController {
     @Body({ schema: startConversationSchema }) body: StartConversationInput,
   ): Promise<WidgetSession> {
     const { organizationId } = await this.assistant.resolveWidget(key);
-    const conversation = await this.chat.start(organizationId, body);
+    // A token signed by the organization's server proves who the visitor is.
+    const verified = body.userToken ? await this.identity.verifyAndUpsert(organizationId, body.userToken) : undefined;
+    const conversation = await this.chat.start(organizationId, body, verified);
     const visitorToken = await this.tokens.issue({ conversationId: conversation.id, organizationId });
     return { conversation, visitorToken };
   }

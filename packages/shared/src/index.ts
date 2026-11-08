@@ -1,3 +1,4 @@
+export * from './agent.js';
 export * from './billing.js';
 export * from './chat.js';
 export * from './knowledge.js';

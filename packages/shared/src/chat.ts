@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { ToolCallView } from './agent.js';
 
 export const CONVERSATION_STATUSES = ['OPEN', 'ESCALATED', 'RESOLVED'] as const;
 export type ConversationStatus = (typeof CONVERSATION_STATUSES)[number];
@@ -47,6 +48,12 @@ export interface ConversationSummary {
 
 export interface ConversationDetail extends ConversationSummary {
   messages: ChatMessage[];
+  /** Whether the visitor's identity was verified with a signed token. */
+  verified: boolean;
+  /** Sensitive actions waiting for approval; the widget keeps polling while any are pending. */
+  pendingApprovals: number;
+  /** Tools the assistant used (team view only). */
+  toolCalls?: ToolCallView[];
   escalatedAt: string | null;
   resolvedAt: string | null;
 }
@@ -104,6 +111,8 @@ export const startConversationSchema = z.object({
   name: z.string().trim().max(100).optional(),
   email: z.email().trim().toLowerCase().max(254).optional(),
   channel: z.enum(['WIDGET', 'PLAYGROUND']).default('WIDGET'),
+  /** JWT signed by the organization's server with its identity secret (sub, email, name). */
+  userToken: z.string().max(4096).optional(),
 });
 export type StartConversationInput = z.infer<typeof startConversationSchema>;
 

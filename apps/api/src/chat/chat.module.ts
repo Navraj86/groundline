@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AgentModule } from '../agent/agent.module.js';
 import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { TicketsModule } from '../tickets/tickets.module.js';
 import { AiClient } from './ai-client.service.js';
@@ -9,7 +10,7 @@ import { WidgetTokenService } from './widget-token.service.js';
 import { WidgetController } from './widget.controller.js';
 
 @Module({
-  imports: [OrganizationsModule, TicketsModule],
+  imports: [OrganizationsModule, TicketsModule, AgentModule],
   controllers: [WidgetController, ConversationsController, AssistantController],
   providers: [AiClient, AssistantService, ChatService, WidgetTokenService],
 })
