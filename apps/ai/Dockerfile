@@ -17,7 +17,7 @@ RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --no-edi
 
 FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
 ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 AI_HOST=0.0.0.0 AI_PORT=8000 ENVIRONMENT=production
-RUN groupadd --system app && useradd --system --gid app --home /app app
+RUN groupadd --system --gid 10001 app && useradd --system --uid 10001 --gid app --home /app app
 # Amazon RDS certificate authorities, so database connections can verify the server.
 ADD --chmod=644 https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem /etc/ssl/rds/global-bundle.pem
 WORKDIR /app

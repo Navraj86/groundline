@@ -1,0 +1,25 @@
+# Everything goes to the web app, except payment webhooks, which the API receives directly.
+# Assumes an ingress controller (ingress-nginx here) and cert-manager for TLS; adjust the
+# class and annotations to your cluster.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: groundline
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-body-size: 25m
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [support.example.com]
+      secretName: groundline-tls
+  rules:
+    - host: support.example.com
+      http:
+        paths:
+          - path: /webhooks
+            pathType: Prefix
+            backend: { service: { name: api, port: { name: http } } }
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: web, port: { name: http } } }

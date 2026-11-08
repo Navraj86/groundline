@@ -89,6 +89,14 @@ jobs:
       - run: terraform init -backend=false -input=false
       - run: terraform validate
 
+  kubernetes:
+    name: Kubernetes manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: kubectl kustomize deploy/k8s > rendered.yaml
+      - run: docker run --rm -v "$PWD:/w" ghcr.io/yannh/kubeconform:v0.7.0 -strict -summary /w/rendered.yaml
+
   # Builds every image on each push and pull request; images from main are published to
   # GitHub Container Registry, tagged with the commit SHA and "main".
   images:

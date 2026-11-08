@@ -1,0 +1,20 @@
+# Non-secret settings. Secrets (DATABASE_URL, REDIS_URL, provider keys...) come from the
+# "groundline" Secret; see secrets.env.example.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: groundline
+data:
+  WEB_URL: https://support.example.com
+  PUBLIC_WEB_URL: https://support.example.com
+  API_URL: http://api:4000
+  AI_SERVICE_URL: http://ai:8000
+  SUPABASE_AUTH_URL: https://YOUR-PROJECT-REF.supabase.co/auth/v1
+  MAIL_FROM: Groundline <no-reply@example.com>
+  DODO_PAYMENTS_ENVIRONMENT: test_mode
+  S3_REGION: us-east-1
+  S3_BUCKET: groundline-uploads
+  QUEUE_PREFIX: groundline
+  ANSWER_REVIEW_SAMPLE_RATE: "0.25"
+  TRUST_PROXY: uniquelocal
+  ENVIRONMENT: production

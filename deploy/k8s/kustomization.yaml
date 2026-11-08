@@ -1,0 +1,40 @@
+# Groundline on any Kubernetes cluster. AWS uses ECS (deploy/terraform); this is the portable
+# equivalent. Postgres (with pgvector), Redis and S3-compatible storage are expected to be
+# managed services you point at through the secret below.
+#
+#   kubectl create namespace groundline
+#   kubectl -n groundline create secret generic groundline --from-env-file=secrets.env
+#   kubectl apply -k deploy/k8s            # runs migrations as a Job, then the services
+#
+# Pin the release by setting image tags below (or `kustomize edit set image ...` in CI).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: groundline
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: groundline
+    includeSelectors: false
+
+resources:
+  - config.yaml
+  - migrate-job.yaml
+  - web.yaml
+  - api.yaml
+  - worker.yaml
+  - ai.yaml
+  - ingress.yaml
+
+images:
+  - name: groundline/web
+    newName: ghcr.io/navraj86/groundline/web
+    newTag: main
+  - name: groundline/api
+    newName: ghcr.io/navraj86/groundline/api
+    newTag: main
+  - name: groundline/migrate
+    newName: ghcr.io/navraj86/groundline/migrate
+    newTag: main
+  - name: groundline/ai
+    newName: ghcr.io/navraj86/groundline/ai
+    newTag: main

@@ -1,0 +1,32 @@
+# Background jobs (evaluations, answer reviews, maintenance). Same image as the API.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: worker }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: worker }
+    spec:
+      # Lets in-flight jobs finish; BullMQ retries anything interrupted.
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: worker
+          image: groundline/api
+          command: ["node", "dist/worker.js"]
+          envFrom:
+            - configMapRef: { name: groundline }
+            - secretRef: { name: groundline }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 512Mi }
