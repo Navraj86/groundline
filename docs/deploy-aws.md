@@ -56,8 +56,20 @@ either one; the details are shown on the sign-up page, and AWS sends a summary b
 
 Either works for this guide. If sign-up offers a **spending limit**, set it to US$25.
 
-> On the Free plan, don't turn on **AWS Organizations** or **IAM Identity Center**: doing so
-> moves the account to the Paid plan.
+> **The new project-based console.** Accounts created with AWS's newer sign-up open on a
+> *Console Home | <project name>* page with **Manage projects / Manage team / Manage billing**.
+> There, each project is its own AWS account, you sign in through the AWS access portal
+> (IAM Identity Center is set up for you, and that's fine on the Free plan), and:
+>
+> - New accounts may be limited to **one project**; put Groundline in the existing one.
+> - A project is **locked to one region** (shown under *Manage projects → Additional info*).
+>   Use that region everywhere below, and pick the same region for Supabase.
+> - Skip A2: your sign-in is already a non-root user.
+> - **CloudShell** can stay unavailable for up to two days while a new account is verified.
+>   Generate the keys in C7 on the server instead (see there).
+>
+> With the classic sign-up, don't turn on AWS Organizations or IAM Identity Center yourself
+> on the Free plan: doing so moves the account to the Paid plan.
 
 ### A2. Secure the account
 
@@ -99,9 +111,10 @@ AWS emails you as the month's spend approaches and passes that amount.
 2. **Database → Extensions:** enable **vector**.
 3. **Connect** (top bar) → **Session pooler**: copy the URI, replacing `[YOUR-PASSWORD]`
    (URL-encode special characters). **Save:** it; you'll use it three times in Part D.
-4. **Project Settings → API Keys:** **Save:** the **anon** / publishable key.
-   **Project Settings → JWT Keys:** if the project has a **legacy JWT secret**, **Save:** it.
-   Projects that sign tokens with asymmetric keys don't need it.
+4. **Project Settings → API Keys:** **Save:** the **publishable** key (`sb_publishable_...`),
+   or the **anon** key on older projects. **Project Settings → JWT Keys:** if a **legacy JWT
+   secret** is listed, you may **Save:** it, but it's optional: new projects sign sign-in tokens
+   with ES256 keys, which the API verifies against the project's public keys either way.
 5. **Project URL** (Project Settings → Data API): **Save:** it. Your Supabase Auth URL is
    that URL followed by `/auth/v1`.
 
@@ -137,7 +150,9 @@ logging in, so on GitHub open your profile → **Packages** → for each of `gro
 - **Bucket name:** something unique, e.g. `groundline-uploads-<your account ID>`.
 - Keep **Block all public access** on and default encryption (**SSE-S3**).
 
-**Save:** bucket name.
+**Save:** the bucket name exactly as the bucket list shows it. Newer accounts append the
+account and region, e.g. `groundline-uploads-123456789012-ap-southeast-2-an`; use that full
+name everywhere.
 
 ### C2. Log group
 
@@ -194,12 +209,17 @@ CloudWatch alarms → Create an alarm**:
    **Alarm action:** **Recover**. **Metric:** *Status check failed: system*. Create.
 2. Repeat with **Alarm action: Reboot** and metric *Status check failed: instance*.
 
+The newer form shows **Alarm when: Failing** instead of a threshold box; that's expected. A red
+**Warning** next to *Actions enabled* usually means the SNS email subscription isn't
+confirmed yet.
+
 Confirm the subscription email AWS sends you.
 
 ### C7. Settings and secrets
 
 First, generate the four internal keys. Open **CloudShell** (the terminal icon in the console's
-top bar, free) and run:
+top bar, free), or, if CloudShell says your account verification is in progress, a terminal on
+the server (C8: **Connect → SSM Session Manager**), and run:
 
 ```bash
 for k in AI_SERVICE_TOKEN WIDGET_TOKEN_SECRET PROXY_SECRET; do echo "$k=$(openssl rand -hex 24)"; done
@@ -228,14 +248,21 @@ email, Vercel URL, Supabase Auth URL, region, bucket), and paste it as the value
 | `SMTP_URL` | from B2 |
 | `DEEPSEEK_API_KEY` and/or `OPENAI_API_KEY` | at least one |
 
-Skip any you don't have yet (payments come in Part G). Values can't contain a single quote.
+Skip any you don't have yet (payments come in Part G).
+
+**No OpenAI key?** The knowledge base needs an embeddings provider to index documents, and
+DeepSeek doesn't offer one. Add an OpenAI key (embeddings cost about US$0.02 per million
+tokens), or add the line `EMBEDDINGS_PROVIDER=fake` to `/groundline/prod/config` for free
+word-matching search: it works when questions use the same words as the documents. If you add
+an OpenAI key later, remove that line, deploy, and click **Reprocess** on each source. Values can't contain a single quote.
 Never change `ENCRYPTION_KEY` once the app is in use: stored connector secrets depend on it.
 
 ### C8. Check the server
 
 **Systems Manager → Fleet Manager** should list the instance as **Online** (allow a few
-minutes after launch). To look inside: **EC2 → Instances →** select it **→ Connect → Session
-Manager → Connect**, then run `docker compose version` and `cat /etc/groundline.conf`.
+minutes after launch). To look inside: **EC2 → Instances →** select it **→ Connect**, choose
+the **SSM Session Manager** card (not *EC2 Instance Connect*, which needs the SSH port you
+closed) **→ Connect**, then run `docker compose version` and `cat /etc/groundline.conf`.
 
 ---
 
@@ -328,4 +355,7 @@ about 4 MB there.
 | Migrations fail with a TLS error | The `?sslmode=...` suffix doesn't match the table in C7. |
 | Certificate error on the API hostname | Caddy couldn't get a certificate: check the `caddy` log stream. Port 80 must stay open, and a custom domain's A record must point at the Elastic IP. |
 | Email links don't sign you in | Supabase Redirect URLs are missing `<Vercel URL>/auth/callback**`. |
+| "Region … unavailable" in the console | Your project is locked to another region: use the region from *Manage projects → Additional info*. |
+| Adding knowledge fails with "Embeddings aren't configured" | No `OPENAI_API_KEY`; add one or set `EMBEDDINGS_PROVIDER=fake` (C7). |
+| Visiting a `groundline-xxxx-….vercel.app` address behaves differently | That's one specific build. Use the project's main address, which always serves the latest. |
 | Vercel pages say Groundline is unavailable | `API_URL` is wrong, or the backend is down (check the logs). |
