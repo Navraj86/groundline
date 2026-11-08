@@ -3,6 +3,7 @@
 import {
   Activity,
   BarChart3,
+  FlaskConical,
   BookOpen,
   Bot,
   Check,
@@ -66,6 +67,7 @@ const supportNav: NavItem[] = [
   { title: "Tickets", href: "/tickets", icon: Ticket, permission: "tickets:manage" },
   { title: "Approvals", href: "/approvals", icon: ShieldCheck, permission: "approvals:read" },
   { title: "Analytics", href: "/analytics", icon: BarChart3, permission: "analytics:read" },
+  { title: "Evaluations", href: "/evaluations", icon: FlaskConical, permission: "evaluations:read" },
 ];
 
 const workspaceNav: NavItem[] = [
