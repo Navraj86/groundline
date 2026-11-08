@@ -46,6 +46,8 @@ model User {
   ticketsCreated      Ticket[]             @relation("TicketCreator")
   ticketEvents        TicketEvent[]
   approvalsDecided    ApprovalRequest[]
+  evalDatasets        EvalDataset[]
+  evalRuns            EvalRun[]
 
   @@map("users")
 }
@@ -83,6 +85,8 @@ model Organization {
   toolCalls     ToolCall[]
   approvals     ApprovalRequest[]
   integrations  Integration[]
+  evalDatasets  EvalDataset[]
+  evalRuns      EvalRun[]
 
   @@map("organizations")
 }
@@ -654,4 +658,120 @@ model Integration {
 
   @@unique([organizationId, kind])
   @@map("integrations")
+}
+
+// ---- Evaluations ------------------------------------------------------------------------
+
+// A named set of test questions for checking the assistant's answers (FR-063).
+model EvalDataset {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String
+  description    String?
+  createdById    String?  @map("created_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  cases        EvalCase[]
+  runs         EvalRun[]
+
+  @@unique([organizationId, name])
+  @@map("eval_datasets")
+}
+
+model EvalCase {
+  id                 String   @id @default(uuid(7)) @db.Uuid
+  datasetId          String   @map("dataset_id") @db.Uuid
+  question           String
+  // What a good answer says. Optional; without it only relevance and groundedness are scored.
+  expectedAnswer     String?  @map("expected_answer")
+  // Knowledge sources a good answer should be based on, for retrieval quality.
+  expectedSourceIds  String[] @default([]) @map("expected_source_ids") @db.Uuid
+  // The assistant should decline (out of scope, unsafe, or not in the knowledge base).
+  expectInsufficient Boolean  @default(false) @map("expect_insufficient")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  dataset EvalDataset  @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  results EvalResult[]
+
+  @@index([datasetId, createdAt])
+  @@map("eval_cases")
+}
+
+enum EvalRunStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// One run of a dataset against the assistant as configured at the time (FR-067).
+model EvalRun {
+  id             String        @id @default(uuid(7)) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  datasetId      String        @map("dataset_id") @db.Uuid
+  status         EvalRunStatus @default(QUEUED)
+  totalCases     Int           @map("total_cases")
+  completedCases Int           @default(0) @map("completed_cases")
+  passedCases    Int           @default(0) @map("passed_cases")
+  // Aggregate scores; see EvalMetrics in @groundline/shared.
+  metrics        Json          @default("{}")
+  promptVersion  String?       @map("prompt_version")
+  provider       String?
+  model          String?
+  judge          String?
+  inputTokens    Int           @default(0) @map("input_tokens")
+  outputTokens   Int           @default(0) @map("output_tokens")
+  error          String?
+  createdById    String?       @map("created_by_id") @db.Uuid
+  startedAt      DateTime?     @map("started_at") @db.Timestamptz(6)
+  completedAt    DateTime?     @map("completed_at") @db.Timestamptz(6)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  dataset      EvalDataset  @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  results      EvalResult[]
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([datasetId, createdAt(sort: Desc)])
+  @@map("eval_runs")
+}
+
+// A case's outcome in a run. The question and expectations are copied so history stays
+// readable after cases are edited or deleted.
+model EvalResult {
+  id                 String   @id @default(uuid(7)) @db.Uuid
+  runId              String   @map("run_id") @db.Uuid
+  caseId             String?  @map("case_id") @db.Uuid
+  question           String
+  expectedAnswer     String?  @map("expected_answer")
+  expectInsufficient Boolean  @default(false) @map("expect_insufficient")
+  answer             String
+  answerStatus       String   @map("answer_status")
+  passed             Boolean
+  relevance          Float?
+  groundedness       Float?
+  correctness        Float?
+  retrievalHit       Boolean? @map("retrieval_hit")
+  reciprocalRank     Float?   @map("reciprocal_rank")
+  retrievedSourceIds String[] @default([]) @map("retrieved_source_ids")
+  unsupportedClaims  Json     @default("[]") @map("unsupported_claims")
+  judgeNotes         String?  @map("judge_notes")
+  latencyMs          Int      @map("latency_ms")
+  inputTokens        Int      @default(0) @map("input_tokens")
+  outputTokens       Int      @default(0) @map("output_tokens")
+  error              String?
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  run      EvalRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
+  evalCase EvalCase? @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  @@unique([runId, caseId])
+  @@index([runId, createdAt])
+  @@map("eval_results")
 }

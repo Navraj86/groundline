@@ -2,6 +2,7 @@ export * from './agent.js';
 export * from './analytics.js';
 export * from './billing.js';
 export * from './chat.js';
+export * from './evaluations.js';
 export * from './knowledge.js';
 export * from './roles.js';
 export * from './schemas.js';

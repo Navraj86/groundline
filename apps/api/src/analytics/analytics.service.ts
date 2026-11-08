@@ -113,6 +113,12 @@ export class AnalyticsService {
               FROM messages
              WHERE organization_id = ${org}::uuid AND review_tokens IS NOT NULL
                AND reviewed_at >= ${start} AND reviewed_at < ${end}
+            UNION ALL
+            -- Evaluation runs: their answers and grading, priced at the answering model.
+            SELECT coalesce(provider || ':' || model, judge), input_tokens + output_tokens
+              FROM eval_runs
+             WHERE organization_id = ${org}::uuid
+               AND created_at >= ${start} AND created_at < ${end}
           ) t GROUP BY 1`,
         this.one`
           SELECT count(*) AS runs, count(*) FILTER (WHERE status = 'FAILED') AS failed, avg(steps) AS avg_steps

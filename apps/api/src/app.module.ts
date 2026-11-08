@@ -10,6 +10,7 @@ import { BillingModule } from './billing/billing.module.js';
 import { ChatModule } from './chat/chat.module.js';
 import { CommonModule } from './common/common.module.js';
 import { validateEnv } from './config/env.js';
+import { EvaluationsModule } from './evaluations/evaluations.module.js';
 import { HealthModule } from './health/health.module.js';
 import { InvitationsModule } from './invitations/invitations.module.js';
 import { KnowledgeModule } from './knowledge/knowledge.module.js';
@@ -49,6 +50,7 @@ import { UsersModule } from './users/users.module.js';
     TicketsModule,
     AgentModule,
     AnalyticsModule,
+    EvaluationsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
