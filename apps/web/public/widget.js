@@ -3,6 +3,9 @@
  *
  *   <script src="https://YOUR-GROUNDLINE-HOST/widget.js" data-groundline-key="wk_..." async></script>
  *
+ * For signed-in customers, add data-user-token="<JWT signed by your server>" or call
+ * window.Groundline.identify(token) so the assistant can help with their account.
+ *
  * Adds a chat button to the page. The chat itself runs in an iframe served by Groundline,
  * so it never touches the host page's DOM, cookies or storage.
  */
@@ -21,6 +24,7 @@
   var position = script.getAttribute("data-position") === "left" ? "left" : "right";
   var open = false;
   var frame = null;
+  var userToken = script.getAttribute("data-user-token") || null;
 
   var button = document.createElement("button");
   button.type = "button";
@@ -75,10 +79,26 @@
 
   button.addEventListener("click", function () { toggle(); });
   window.addEventListener("resize", layout);
+  function sendIdentity() {
+    if (frame && frame.contentWindow && userToken) {
+      frame.contentWindow.postMessage({ type: "groundline:identify", token: userToken }, origin);
+    }
+  }
+
   window.addEventListener("message", function (event) {
-    if (event.origin !== origin || !event.data || event.data.type !== "groundline:close") return;
-    toggle(false);
+    if (event.origin !== origin || !event.data) return;
+    if (event.data.type === "groundline:close") toggle(false);
+    if (event.data.type === "groundline:ready") sendIdentity();
   });
+
+  window.Groundline = {
+    identify: function (token) {
+      userToken = token || null;
+      sendIdentity();
+    },
+    open: function () { toggle(true); },
+    close: function () { toggle(false); },
+  };
 
   // Match the button to the assistant's brand color.
   fetch(origin + "/api/widget/" + encodeURIComponent(key))

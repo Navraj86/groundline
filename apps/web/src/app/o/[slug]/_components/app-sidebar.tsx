@@ -11,8 +11,10 @@ import {
   LayoutDashboard,
   LogOut,
   MessagesSquare,
+  Plug,
   Plus,
   Settings,
+  ShieldCheck,
   Ticket,
   UserRound,
   Users,
@@ -61,12 +63,14 @@ const supportNav: NavItem[] = [
   { title: "Knowledge base", href: "/knowledge", icon: BookOpen, permission: "knowledge:read" },
   { title: "Conversations", href: "/conversations", icon: MessagesSquare, permission: "conversations:read" },
   { title: "Assistant", href: "/assistant", icon: Bot, permission: "knowledge:read" },
-  { title: "Tickets", href: "/tickets", icon: Ticket, permission: "tickets:manage", soon: true },
+  { title: "Tickets", href: "/tickets", icon: Ticket, permission: "tickets:manage" },
+  { title: "Approvals", href: "/approvals", icon: ShieldCheck, permission: "approvals:read" },
   { title: "Analytics", href: "/analytics", icon: BarChart3, permission: "analytics:read", soon: true },
 ];
 
 const workspaceNav: NavItem[] = [
   { title: "Team", href: "/team", icon: Users, permission: "members:read" },
+  { title: "Integrations", href: "/integrations", icon: Plug, permission: "integrations:manage" },
   { title: "Billing", href: "/billing", icon: CreditCard, permission: "billing:read" },
   { title: "Activity", href: "/activity", icon: Activity, permission: "audit:read" },
   { title: "Settings", href: "/settings", icon: Settings },

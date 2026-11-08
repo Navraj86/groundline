@@ -2,7 +2,7 @@ import { ArrowLeft, Bot, ExternalLink, UserRound, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { hasPermission, type ChatMessage, type ConversationDetail } from "@groundline/shared";
+import { hasPermission, type ChatMessage, type ConversationDetail, type ToolCallStatus } from "@groundline/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,14 @@ import { STATUS_BADGE } from "../status";
 import { LiveRefresh, ReplyBox, StatusButton } from "./conversation-controls";
 
 export const metadata: Metadata = { title: "Conversation" };
+
+const TOOL_STATUS: Record<ToolCallStatus, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
+  SUCCEEDED: { label: "Done", variant: "secondary" },
+  FAILED: { label: "Failed", variant: "destructive" },
+  BLOCKED: { label: "Blocked", variant: "outline" },
+  PENDING_APPROVAL: { label: "Awaiting approval", variant: "default" },
+  REJECTED: { label: "Rejected", variant: "outline" },
+};
 
 const ANSWER_LABEL = {
   ANSWERED: null,
@@ -93,10 +101,40 @@ export default async function ConversationPage({ params }: PageProps<"/o/[slug]/
                 <CardTitle className="text-sm">Customer</CardTitle>
               </CardHeader>
               <CardContent className="space-y-1 text-sm">
-                <p>{conversation.visitorName ?? "Anonymous visitor"}</p>
+                <p>
+                  {conversation.visitorName ?? "Anonymous visitor"}{" "}
+                  {conversation.verified && <Badge variant="secondary">Verified</Badge>}
+                </p>
                 <p className="text-muted-foreground">{conversation.visitorEmail ?? "No email shared"}</p>
               </CardContent>
             </Card>
+            {conversation.toolCalls && conversation.toolCalls.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Agent activity</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {conversation.toolCalls.map((t) => (
+                    <div key={t.id} className="space-y-1 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium">{t.label}</span>
+                        <Badge variant={TOOL_STATUS[t.status].variant}>{TOOL_STATUS[t.status].label}</Badge>
+                      </div>
+                      {Object.keys(t.input).length > 0 && (
+                        <p className="truncate font-mono text-muted-foreground" title={JSON.stringify(t.input)}>
+                          {JSON.stringify(t.input)}
+                        </p>
+                      )}
+                      {t.error && <p className="text-muted-foreground">{t.error}</p>}
+                      <p className="text-muted-foreground">
+                        {formatDateTime(t.createdAt)}
+                        {t.durationMs != null && ` · ${t.durationMs} ms`}
+                      </p>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm">AI usage</CardTitle>

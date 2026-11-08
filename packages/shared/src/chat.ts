@@ -96,6 +96,8 @@ export interface SendMessageResult {
   /** The assistant's reply, or null when the conversation is with a human. */
   reply: ChatMessage | null;
   status: ConversationStatus;
+  /** Sensitive actions from this conversation still waiting for approval. */
+  pendingApprovals: number;
 }
 
 export const assistantSettingsSchema = z.object({

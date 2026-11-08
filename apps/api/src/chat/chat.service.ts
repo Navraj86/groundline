@@ -94,13 +94,19 @@ export class ChatService {
 
     if (conversation.status === 'ESCALATED') {
       // A human owns this conversation now; the AI stays quiet.
-      return { message: toMessage(customerMessage, false), reply: null, status: 'ESCALATED' };
+      return {
+        message: toMessage(customerMessage, false),
+        reply: null,
+        status: 'ESCALATED',
+        pendingApprovals: await this.prisma.approvalRequest.count({ where: { conversationId, status: 'PENDING' } }),
+      };
     }
 
     const reply = await this.generateReply(conversation, content);
     // Tools can change the conversation (create_ticket hands it to the team), so re-read it.
     const { status } = await this.prisma.conversation.findUniqueOrThrow({ where: { id: conversationId }, select: { status: true } });
-    return { message: toMessage(customerMessage, false), reply: toMessage(reply, false), status };
+    const pendingApprovals = await this.prisma.approvalRequest.count({ where: { conversationId, status: 'PENDING' } });
+    return { message: toMessage(customerMessage, false), reply: toMessage(reply, false), status, pendingApprovals };
   }
 
   /** Hands the conversation to the team (FR-038). Tickets attach to this in a later phase. */

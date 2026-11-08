@@ -13,7 +13,7 @@ import type {
 import { cn } from "@/lib/utils";
 import { renderAnswer } from "@/components/render-answer";
 
-type Session = { conversationId: string; token: string };
+type Session = { conversationId: string; token: string; verified?: boolean };
 type Pending = { id: string; content: string };
 
 const POLL_MS = 5000;
@@ -68,6 +68,9 @@ export function ChatWidget({
   const [session, setSession] = useState<Session | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [status, setStatus] = useState<ConversationStatus>("OPEN");
+  const [pendingApprovals, setPendingApprovals] = useState(0);
+  // Identity token from the host page (widget.js), proving who the visitor is.
+  const userToken = useRef<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +86,31 @@ export function ChatWidget({
   const applyConversation = useCallback((c: ConversationDetail) => {
     setMessages(c.messages);
     setStatus(c.status);
+    setPendingApprovals(c.pendingApprovals);
   }, []);
+
+  // The host page sends the signed-in customer's identity token (see public/widget.js).
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== window.parent || event.data?.type !== "groundline:identify") return;
+      const token = typeof event.data.token === "string" ? event.data.token : null;
+      if (!token || token === userToken.current) return;
+      userToken.current = token;
+      // An anonymous conversation can't become verified; the next message starts a verified one.
+      setSession((current) => {
+        if (current && !current.verified) {
+          saveSession(widgetKey, null);
+          setMessages([]);
+          setStatus("OPEN");
+          return null;
+        }
+        return current;
+      });
+    };
+    window.addEventListener("message", onMessage);
+    window.parent.postMessage({ type: "groundline:ready" }, "*");
+    return () => window.removeEventListener("message", onMessage);
+  }, [widgetKey]);
 
   // Resume a previous conversation from this browser (not in dashboard previews).
   useEffect(() => {
@@ -100,14 +127,14 @@ export function ChatWidget({
 
   // Once a person has taken over, poll for their replies.
   useEffect(() => {
-    if (!session || status !== "ESCALATED") return;
+    if (!session || (status !== "ESCALATED" && pendingApprovals === 0)) return;
     const timer = setInterval(() => {
       call<ConversationDetail>(`conversations/${session.conversationId}`, { token: session.token })
         .then(applyConversation)
         .catch(() => undefined);
     }, POLL_MS);
     return () => clearInterval(timer);
-  }, [session, status, applyConversation]);
+  }, [session, status, pendingApprovals, applyConversation]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -117,9 +144,12 @@ export function ChatWidget({
     if (session) return session;
     const created = await call<WidgetSession>(`${widgetKey}/conversations`, {
       method: "POST",
-      body: JSON.stringify({ channel: preview ? "PLAYGROUND" : "WIDGET" }),
+      body: JSON.stringify({
+        channel: preview ? "PLAYGROUND" : "WIDGET",
+        ...(userToken.current ? { userToken: userToken.current } : {}),
+      }),
     });
-    const next = { conversationId: created.conversation.id, token: created.visitorToken };
+    const next = { conversationId: created.conversation.id, token: created.visitorToken, verified: created.conversation.verified };
     setSession(next);
     if (!preview) saveSession(widgetKey, next);
     return next;
@@ -140,6 +170,7 @@ export function ChatWidget({
       });
       setMessages((prev) => [...prev, result.message, ...(result.reply ? [result.reply] : [])]);
       setStatus(result.status);
+      setPendingApprovals(result.pendingApprovals);
     } catch (err) {
       const e = err as Error & { status?: number };
       if (e.status === 401) {

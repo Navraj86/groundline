@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { hasPermission, type AssistantConfig } from "@groundline/shared";
+import { hasPermission, type AssistantConfig, type ToolInfo } from "@groundline/shared";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/api";
 import { requireOrg } from "@/lib/auth";
 import { PageBody, PageHeader } from "../_components/page-header";
+import { ToolToggle } from "../integrations/integrations-client";
 import { AssistantForm, EmbedSnippet } from "./assistant-client";
 
 export const metadata: Metadata = { title: "Assistant" };
@@ -23,7 +25,10 @@ export default async function AssistantPage({ params }: PageProps<"/o/[slug]/ass
   const { org } = await requireOrg(slug);
   if (!hasPermission(org.role, "knowledge:read")) notFound();
 
-  const config = await api<AssistantConfig>(`/orgs/${org.id}/assistant`);
+  const [config, tools] = await Promise.all([
+    api<AssistantConfig>(`/orgs/${org.id}/assistant`),
+    hasPermission(org.role, "agent:read") ? api<ToolInfo[]>(`/orgs/${org.id}/agent/tools`) : Promise.resolve([]),
+  ]);
   const canEdit = hasPermission(org.role, "assistant:manage");
   const origin = await publicOrigin();
   const snippet = `<script src="${origin}/widget.js" data-groundline-key="${config.widgetKey}" async></script>`;
@@ -43,6 +48,36 @@ export default async function AssistantPage({ params }: PageProps<"/o/[slug]/ass
                 <AssistantForm orgId={org.id} slug={org.slug} settings={config.settings} canEdit={canEdit} />
               </CardContent>
             </Card>
+            {tools.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Tools</CardTitle>
+                  <CardDescription>
+                    What the assistant may do beyond answering. Account tools only work for verified customers when an
+                    account system is connected (see Integrations). Sensitive actions always wait for approval.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="divide-y">
+                  {tools.map((t) => (
+                    <div key={t.name} className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0">
+                      <div className="min-w-0 space-y-1">
+                        <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                          {t.label}
+                          {t.sensitive && <Badge variant="outline">Needs approval</Badge>}
+                          {t.requiresCustomer && <Badge variant="outline">Verified customers</Badge>}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{t.description}</p>
+                      </div>
+                      {canEdit ? (
+                        <ToolToggle ctx={{ orgId: org.id, slug: org.slug }} tool={t.name} enabled={t.enabled} />
+                      ) : (
+                        <Badge variant="secondary">{t.enabled ? "On" : "Off"}</Badge>
+                      )}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
             <Card>
               <CardHeader>
                 <CardTitle>Add the chat to your website</CardTitle>
