@@ -97,11 +97,12 @@ jobs:
       - run: kubectl kustomize deploy/k8s > rendered.yaml
       - run: docker run --rm -v "$PWD:/w" ghcr.io/yannh/kubeconform:v0.7.0 -strict -summary /w/rendered.yaml
 
-  # Builds every image on each push and pull request; images from main are published to
-  # GitHub Container Registry, tagged with the commit SHA and "main".
+  # Builds every image for amd64 and arm64 (native runners) on each push and pull request.
+  # From main, each architecture is pushed to GitHub Container Registry and then merged into
+  # multi-arch tags: the commit SHA and "main".
   images:
-    name: Image (${{ matrix.name }})
-    runs-on: ubuntu-latest
+    name: Image (${{ matrix.image.name }}, ${{ matrix.arch }})
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     needs: [typescript, api-e2e, ai]
     permissions:
       contents: read
@@ -109,7 +110,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
+        arch: [amd64, arm64]
+        image:
           - { name: web, dockerfile: apps/web/Dockerfile, target: runtime }
           - { name: api, dockerfile: apps/api/Dockerfile, target: runtime }
           - { name: migrate, dockerfile: apps/api/Dockerfile, target: migrate }
@@ -125,20 +127,37 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}/${{ matrix.name }}
-          tags: |
-            type=sha,format=long,prefix=
-            type=ref,event=branch
+      - id: name
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}/${{ matrix.image.name }}" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v6
         with:
           context: .
-          file: ${{ matrix.dockerfile }}
-          target: ${{ matrix.target }}
+          file: ${{ matrix.image.dockerfile }}
+          target: ${{ matrix.image.target }}
+          platforms: linux/${{ matrix.arch }}
           push: ${{ env.PUBLISH == 'true' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+          tags: ${{ steps.name.outputs.image }}:${{ github.sha }}-${{ matrix.arch }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=${{ matrix.image.name }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}-${{ matrix.arch }}
+
+  publish:
+    name: Publish multi-arch images
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [images]
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - run: |
+          set -euo pipefail
+          base="ghcr.io/${GITHUB_REPOSITORY,,}"
+          for name in web api migrate ai; do
+            docker buildx imagetools create               --tag "$base/$name:$GITHUB_SHA" --tag "$base/$name:main"               "$base/$name:$GITHUB_SHA-amd64" "$base/$name:$GITHUB_SHA-arm64"
+          done
