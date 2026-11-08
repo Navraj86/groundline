@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds the Groundline images and pushes them to the stack's ECR repositories.
 #
-#   deploy/scripts/push-images.sh [tag]
+#   deploy/aws-ecs/scripts/push-images.sh [tag]
 #
 # The tag defaults to the current commit SHA. Run from anywhere inside the repository with
 # AWS credentials for the target account and AWS_REGION set. Extra `docker buildx build`

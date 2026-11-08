@@ -1,10 +1,15 @@
-# Deploying Groundline to AWS
+# Scaling up: Groundline on ECS Fargate
+
+> **This is the scale-up path, not the default.** It costs roughly US$150–250 a month. For a
+> low-cost deployment (about US$15–20 a month) follow [deploy-aws.md](deploy-aws.md) instead,
+> which runs the backend on one small EC2 instance with free services around it. Move here when
+> traffic outgrows a single instance.
 
 This guide takes you from an empty AWS account to Groundline running on ECS Fargate, then
 sets up one-click deploys from GitHub. Plan on about an hour the first time, most of it
 waiting for the database and certificates.
 
-What gets created (all in `deploy/terraform`):
+What gets created (all in `deploy/aws-ecs/terraform`):
 
 ```
 Internet ──▶ Application Load Balancer (HTTPS)
@@ -100,7 +105,7 @@ plain HTTP on the load balancer's address.
 ## 5. Configure Terraform
 
 ```bash
-cd deploy/terraform
+cd deploy/aws-ecs/terraform
 cp backend.hcl.example backend.hcl          # set bucket = the name printed in step 3, and region
 cp terraform.tfvars.example terraform.tfvars # set region, supabase_auth_url, domain, emails...
 terraform init -backend-config=backend.hcl
@@ -116,14 +121,14 @@ ECS can only start once images exist, so create the ECR repositories first:
 ```bash
 terraform apply -target=aws_ecr_repository.app -var image_tag=bootstrap
 cd ../..
-deploy/scripts/push-images.sh            # builds and pushes web, api, migrate, ai (10–15 min)
+deploy/aws-ecs/scripts/push-images.sh            # builds and pushes web, api, migrate, ai (10–15 min)
 TAG=$(git rev-parse HEAD); echo "$TAG"
 ```
 
 ## 7. Create everything else
 
 ```bash
-cd deploy/terraform
+cd deploy/aws-ecs/terraform
 terraform plan -var image_tag="$TAG"      # review: about 90 resources to add
 terraform apply -var image_tag="$TAG"     # 15–25 minutes, mostly the database and Redis
 ```
@@ -152,7 +157,7 @@ Then create the database tables and plans, and restart the services so they pick
 secrets:
 
 ```bash
-deploy/scripts/migrate.sh
+deploy/aws-ecs/scripts/migrate.sh
 for s in web api worker ai; do
   aws ecs update-service --cluster groundline-prod --service $s --force-new-deployment >/dev/null
 done
@@ -211,7 +216,7 @@ The database, load balancer and repositories are protected against accidental de
 To remove everything:
 
 ```bash
-cd deploy/terraform
+cd deploy/aws-ecs/terraform
 # 1. Turn off deletion protection on the database and the load balancer:
 aws rds modify-db-instance --db-instance-identifier groundline-prod --no-deletion-protection --apply-immediately
 aws elbv2 modify-load-balancer-attributes --load-balancer-arn "$(aws elbv2 describe-load-balancers --names groundline-prod --query 'LoadBalancers[0].LoadBalancerArn' --output text)" \

@@ -15,7 +15,7 @@ resource "aws_lb" "main" {
   subnets                    = [for s in aws_subnet.public : s.id]
   drop_invalid_header_fields = true
   idle_timeout               = 120
-  # Must be turned off by hand before `terraform destroy` (see docs/deploy-aws.md).
+  # Must be turned off by hand before `terraform destroy` (see docs/deploy-aws-ecs.md).
   enable_deletion_protection = true
 }
 

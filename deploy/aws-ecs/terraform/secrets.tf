@@ -3,7 +3,7 @@
 # - "database": connection URLs built here. The RDS CA bundle ships in the images at
 #   /etc/ssl/rds/global-bundle.pem, so every client verifies the server certificate.
 # - "app": generated keys plus provider credentials you fill in after the first apply
-#   (see docs/deploy-aws.md). Terraform never overwrites values you've changed.
+#   (see docs/deploy-aws-ecs.md). Terraform never overwrites values you've changed.
 
 locals {
   rds_ca  = "/etc/ssl/rds/global-bundle.pem"

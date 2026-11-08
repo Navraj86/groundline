@@ -14,7 +14,7 @@ terraform {
 
   # State lives in S3 with native locking. Configure it per environment:
   #   terraform init -backend-config=backend.hcl
-  # (see backend.hcl.example and docs/deploy-aws.md).
+  # (see backend.hcl.example and docs/deploy-aws-ecs.md).
   backend "s3" {}
 }
 

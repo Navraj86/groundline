@@ -31,6 +31,6 @@ CLAUDE.md
 *.tfstate
 *.tfstate.*
 *.tfplan
-deploy/terraform/terraform.tfvars
-deploy/terraform/backend.hcl
+**/terraform.tfvars
+**/backend.hcl
 deploy/k8s/secrets.env

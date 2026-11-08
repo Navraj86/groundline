@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Runs the migration task (Prisma migrations + plan catalog seed) on ECS and waits for it.
 #
-#   deploy/scripts/migrate.sh
+#   deploy/aws-ecs/scripts/migrate.sh
 #
-# Uses the outputs of the Terraform stack in deploy/terraform, so run it after `terraform
+# Uses the outputs of the Terraform stack in deploy/aws-ecs/terraform, so run it after `terraform
 # apply` has created (or updated) the migrate task definition. Exits non-zero on failure.
 set -euo pipefail
 
-cd "$(git rev-parse --show-toplevel)/deploy/terraform"
+cd "$(git rev-parse --show-toplevel)/deploy/aws-ecs/terraform"
 : "${AWS_REGION:?Set AWS_REGION}"
 
 cluster=$(terraform output -raw ecs_cluster)

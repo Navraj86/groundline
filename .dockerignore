@@ -16,5 +16,5 @@ apps/ai/.venv
 **/__pycache__
 **/.pytest_cache
 **/.ruff_cache
-deploy/terraform/**/.terraform
-deploy/terraform/**/*.tfstate*
+deploy/**/.terraform
+deploy/**/*.tfstate*
