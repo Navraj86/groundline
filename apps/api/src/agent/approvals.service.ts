@@ -1,8 +1,10 @@
-import { ConflictException, GoneException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, GoneException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import type { AgentToolName, ApprovalStatus, ApprovalView, DecideApprovalInput, Paginated } from '@groundline/shared';
 import { AuditService } from '../audit/audit.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { QueueService } from '../queue/queue.service.js';
+import { QUEUES } from '../queue/queues.js';
 import { ToolExecutor } from './tool-executor.service.js';
 import { TOOLS_BY_NAME } from './tools.js';
 
@@ -17,12 +19,25 @@ type ApprovalRow = Prisma.ApprovalRequestGetPayload<{ include: typeof approvalIn
 
 /** Human review of sensitive agent actions (workflow 7.5, FR-054). */
 @Injectable()
-export class ApprovalsService {
+export class ApprovalsService implements OnModuleInit {
+  private readonly logger = new Logger(ApprovalsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly executor: ToolExecutor,
     private readonly audit: AuditService,
+    private readonly queues: QueueService,
   ) {}
+
+  onModuleInit(): void {
+    // Requests also expire lazily when listed; the schedule keeps tool-call history accurate.
+    this.queues.handle(QUEUES.maintenance, 'expire-approvals', async () => {
+      const expired = await this.expireOverdue();
+      if (expired) this.logger.log(`Expired ${expired} overdue approval request(s)`);
+      return { expired };
+    });
+    this.queues.schedule(QUEUES.maintenance, 'expire-approvals', 5 * 60_000);
+  }
 
   async list(
     organizationId: string,
@@ -117,12 +132,14 @@ export class ApprovalsService {
     return toView(row);
   }
 
-  private async expireOverdue(organizationId: string): Promise<void> {
+  /** Marks overdue pending requests as expired, for one organization or all of them. */
+  async expireOverdue(organizationId?: string): Promise<number> {
     const overdue = await this.prisma.approvalRequest.findMany({
-      where: { organizationId, status: 'PENDING', expiresAt: { lte: new Date() } },
+      where: { ...(organizationId ? { organizationId } : {}), status: 'PENDING', expiresAt: { lte: new Date() } },
       select: { id: true, toolCallId: true },
+      take: 500,
     });
-    if (overdue.length === 0) return;
+    if (overdue.length === 0) return 0;
     await this.prisma.$transaction([
       this.prisma.approvalRequest.updateMany({ where: { id: { in: overdue.map((o) => o.id) } }, data: { status: 'EXPIRED' } }),
       this.prisma.toolCall.updateMany({
@@ -130,6 +147,7 @@ export class ApprovalsService {
         data: { status: 'REJECTED', error: 'Expired without review', completedAt: new Date() },
       }),
     ]);
+    return overdue.length;
   }
 }
 

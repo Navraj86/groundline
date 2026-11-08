@@ -15,6 +15,7 @@ import { KnowledgeModule } from './knowledge/knowledge.module.js';
 import { AppMailModule } from './mail/mail.config.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { QueueModule } from './queue/queue.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { TicketsModule } from './tickets/tickets.module.js';
 import { UsersModule } from './users/users.module.js';
@@ -32,6 +33,7 @@ import { UsersModule } from './users/users.module.js';
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 300 }]),
     PrismaModule,
     CommonModule,
+    QueueModule,
     AppMailModule,
     StorageModule,
     AuditModule,

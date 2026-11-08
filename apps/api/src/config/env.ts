@@ -11,6 +11,12 @@ export const envSchema = z
     WEB_URL: z.url().default('http://localhost:3000'),
     DATABASE_URL: z.string().min(1),
     REDIS_URL: z.string().default('redis://localhost:6379'),
+    // Run background job workers in this process. Set to false on API instances when a
+    // separate worker process (dist/worker.js) handles jobs.
+    WORKERS_ENABLED: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((v) => v === 'true'),
 
     // Supabase Auth. Locally this is the GoTrue container; in production a Supabase project
     // (https://<ref>.supabase.co/auth/v1).
