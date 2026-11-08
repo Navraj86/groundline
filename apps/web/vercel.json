@@ -1,6 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "cd ../.. && pnpm turbo run build --filter=@groundline/web",
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- . ../../packages/shared ../../pnpm-lock.yaml"
+  "buildCommand": "cd ../.. && pnpm turbo run build --filter=@groundline/web"
 }
