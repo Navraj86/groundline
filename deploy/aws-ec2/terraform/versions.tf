@@ -13,7 +13,7 @@ terraform {
   }
 
   # State in S3 with native locking: terraform init -backend-config=backend.hcl
-  # (see backend.hcl.example and docs/deploy-aws.md).
+  # (see backend.hcl.example and docs/deploy-aws-terraform.md).
   backend "s3" {}
 }
 

@@ -4,7 +4,7 @@
 #   <path>config            non-secret settings, managed here
 #   <path>secrets/<NAME>    one SecureString per secret; "-" means not set yet.
 #                           Generated ones are filled in; the rest you set after the first
-#                           apply (docs/deploy-aws.md). Terraform never overwrites your values.
+#                           apply (docs/deploy-aws-terraform.md). Terraform never overwrites your values.
 
 resource "aws_ssm_parameter" "config" {
   name = "${local.param_path}config"
@@ -43,7 +43,7 @@ locals {
     { for k, v in random_password.generated : k => v.result },
     { ENCRYPTION_KEY = random_bytes.encryption_key.base64 },
   )
-  # Filled in by you; see the table in docs/deploy-aws.md.
+  # Filled in by you; see the table in docs/deploy-aws-terraform.md.
   manual_secrets = [
     "DATABASE_URL", "MIGRATE_DATABASE_URL", "AI_DATABASE_URL",
     "SUPABASE_ANON_KEY", "SUPABASE_JWT_SECRET", "SMTP_URL",

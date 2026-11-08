@@ -1,4 +1,8 @@
-# Deploying Groundline (low-cost: AWS + free tiers)
+# Deploying Groundline with Terraform (low-cost: AWS + free tiers)
+
+> The same setup as [deploy-aws.md](deploy-aws.md), which does everything in the AWS console.
+> This version creates the AWS side with Terraform (`deploy/aws-ec2/terraform`) and the CLI,
+> so it can be recreated or changed with one command.
 
 This is the default way to run Groundline: the backend on **one small AWS instance**, and free
 tiers for everything else. It costs about **US$15–20 a month**, all of it AWS. When you

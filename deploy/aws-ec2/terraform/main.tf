@@ -1,6 +1,6 @@
 # The low-cost deployment: one Graviton instance runs the backend containers (API, worker,
 # AI service, Redis, Caddy). Postgres and sign-in are on Supabase, the web app on Vercel.
-# Roughly US$15-20 a month; see docs/deploy-aws.md for the breakdown.
+# Roughly US$15-20 a month; see docs/deploy-aws-terraform.md for the breakdown.
 
 locals {
   name       = "groundline-${var.environment}"

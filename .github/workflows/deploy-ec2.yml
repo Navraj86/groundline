@@ -4,10 +4,11 @@ name: Deploy backend to AWS (EC2)
 # using the multi-arch images CI published to GHCR. Can also be run by hand for any commit
 # whose images exist. The web app deploys separately through Vercel's Git integration.
 #
-# Setup (docs/deploy-aws.md, step 9): a "production" environment with these variables:
-#   AWS_DEPLOY_ROLE_ARN   terraform output github_deploy_role_arn
+# Setup: docs/deploy-aws.md (console) or docs/deploy-aws-terraform.md. A "production"
+# environment with these variables:
+#   AWS_DEPLOY_ROLE_ARN   ARN of the GitHub deploy role
 #   AWS_REGION            e.g. ap-south-1
-#   AWS_INSTANCE_ID       terraform output instance_id
+#   AWS_INSTANCE_ID       the instance ID (i-...)
 # Until AWS_DEPLOY_ROLE_ARN is set, this workflow skips itself.
 
 on:
