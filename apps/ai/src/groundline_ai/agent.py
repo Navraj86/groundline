@@ -15,6 +15,7 @@ from groundline_ai import llm
 from groundline_ai.answering import (
     ERROR_MESSAGE,
     NO_ANSWER,
+    PROMPT_VERSION,
     AnswerRequest,
     SourceRef,
     build_instructions,
@@ -64,6 +65,7 @@ class AgentResponse(BaseModel):
     input_tokens: int | None = None
     output_tokens: int | None = None
     latency_ms: int
+    prompt_version: str = PROMPT_VERSION
 
 
 def tool_guidance(request: AgentRequest) -> str:
@@ -104,19 +106,27 @@ def build_input(request: AgentRequest) -> list[dict[str, Any]]:
     return items
 
 
-async def respond(request: AgentRequest, settings: Settings) -> AgentResponse:
+def retrieval_query(request: AnswerRequest) -> str:
+    """The question plus the previous customer message, so follow-ups still find the right material."""
+    previous = next((m.content for m in reversed(request.history) if m.role == "CUSTOMER"), "")
+    return f"{previous}\n{request.question}".strip() if previous else request.question
+
+
+async def respond(
+    request: AgentRequest, settings: Settings, hits: list[Hit] | None = None
+) -> AgentResponse:
+    """One agent step. Pass `hits` to reuse a retrieval that was already done."""
     started = time.perf_counter()
 
     def elapsed() -> int:
         return int((time.perf_counter() - started) * 1000)
 
-    previous = next((m.content for m in reversed(request.history) if m.role == "CUSTOMER"), "")
-    query = f"{previous}\n{request.question}".strip() if previous else request.question
-    try:
-        hits: list[Hit] = await search(request.organization_id, query, settings)
-    except Exception:
-        log.exception("Retrieval failed")
-        hits = []
+    if hits is None:
+        try:
+            hits = await search(request.organization_id, retrieval_query(request), settings)
+        except Exception:
+            log.exception("Retrieval failed")
+            hits = []
 
     if not hits and not request.tools:
         return _insufficient(request, elapsed())

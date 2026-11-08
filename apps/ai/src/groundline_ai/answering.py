@@ -14,6 +14,9 @@ from groundline_ai.retrieval import Hit, search
 log = logging.getLogger(__name__)
 
 NO_ANSWER = "NO_ANSWER"
+#: Identifies the answering prompt. Bump it whenever the instructions change, so replies and
+#: evaluation runs can be compared by the prompt that produced them.
+PROMPT_VERSION = "support-2026.11.1"
 HISTORY_TURNS = 8
 _CITATION = re.compile(r"\[(\d{1,2})\]")
 
@@ -56,6 +59,7 @@ class AnswerResponse(BaseModel):
     input_tokens: int | None = None
     output_tokens: int | None = None
     latency_ms: int
+    prompt_version: str = PROMPT_VERSION
 
 
 def insufficient_message(profile: AssistantProfile) -> str:

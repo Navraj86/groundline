@@ -19,6 +19,14 @@ from groundline_ai.agent import AgentRequest, AgentResponse, respond
 from groundline_ai.answering import AnswerRequest, AnswerResponse, answer
 from groundline_ai.config import get_settings
 from groundline_ai.db import close_pool, open_pool
+from groundline_ai.evaluation import (
+    EvalCaseRequest,
+    EvalCaseResult,
+    Grade,
+    GradeRequest,
+    grade_answer,
+    run_case,
+)
 from groundline_ai.ingestion.worker import run_worker
 from groundline_ai.migrate import migrate
 
@@ -76,3 +84,15 @@ async def create_answer(request: AnswerRequest) -> AnswerResponse:
 async def agent_respond(request: AgentRequest) -> AgentResponse:
     """One agent step: an answer, or tool calls for the core API to vet and run."""
     return await respond(request, get_settings())
+
+
+@app.post("/v1/eval/grade", tags=["evaluation"], dependencies=[Depends(require_service_token)])
+async def eval_grade(request: GradeRequest) -> Grade:
+    """Scores a live answer's relevance and groundedness against the sources it cited."""
+    return await grade_answer(request, get_settings())
+
+
+@app.post("/v1/eval/case", tags=["evaluation"], dependencies=[Depends(require_service_token)])
+async def eval_case(request: EvalCaseRequest) -> EvalCaseResult:
+    """Answers one evaluation question and scores retrieval and answer quality."""
+    return await run_case(request, get_settings())
