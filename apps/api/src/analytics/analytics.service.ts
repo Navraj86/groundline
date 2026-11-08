@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   GROUNDEDNESS_FLAG_THRESHOLD,
@@ -15,6 +15,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CacheService } from '../queue/cache.service.js';
 import { DEFAULT_MODEL_PRICES, parsePriceOverrides, PriceList } from './pricing.js';
+import { LEGACY_TIME_ZONES } from './time-zones.js';
 
 /** Reports are cached briefly so dashboards stay fast without going noticeably stale. */
 const CACHE_SECONDS = 60;
@@ -27,6 +28,7 @@ const round = (v: number | null, digits = 3): number | null => (v === null ? nul
 @Injectable()
 export class AnalyticsService {
   private readonly prices: PriceList;
+  private zones: Promise<Set<string>> | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -39,7 +41,8 @@ export class AnalyticsService {
     });
   }
 
-  report(organizationId: string, query: AnalyticsQuery): Promise<AnalyticsReport> {
+  async report(organizationId: string, input: AnalyticsQuery): Promise<AnalyticsReport> {
+    const query = { ...input, tz: await this.resolveTimeZone(input.tz) };
     const key = `analytics:${organizationId}:${query.from}:${query.to}:${query.tz}`;
     return this.cache.getOrSet(key, CACHE_SECONDS, () => this.build(organizationId, query));
   }
@@ -186,8 +189,9 @@ export class AnalyticsService {
     for (const row of qualityUsage) {
       const tokens = num(row.tokens);
       qualityTokens += tokens;
-      const model = String(row.judge ?? '').split(':').pop() ?? '';
-      if (row.judge === 'heuristic') continue;
+      const judge = typeof row.judge === 'string' ? row.judge : '';
+      if (!judge || judge === 'heuristic') continue;
+      const model = judge.split(':').pop() ?? judge;
       const cost = this.prices.cost(model, tokens, 0);
       if (cost === null) costIncomplete = true;
       else estimatedCostUsd += cost;
@@ -317,6 +321,21 @@ export class AnalyticsService {
       },
       daily: [...series.values()],
     };
+  }
+
+  /** The zone's name as Postgres knows it, translating legacy aliases browsers still send. */
+  private async resolveTimeZone(tz: string): Promise<string> {
+    this.zones ??= this.prisma.$queryRaw<{ name: string }[]>`SELECT name FROM pg_timezone_names`
+      .then((rows) => new Set(rows.map((r) => r.name)))
+      .catch((err: unknown) => {
+        this.zones = null;
+        throw err;
+      });
+    const zones = await this.zones;
+    for (const candidate of [tz, LEGACY_TIME_ZONES[tz]]) {
+      if (candidate && zones.has(candidate)) return candidate;
+    }
+    throw new BadRequestException(`Time zone "${tz}" isn't supported. Choose a different one.`);
   }
 
   private async one(strings: TemplateStringsArray, ...values: unknown[]): Promise<Row> {
