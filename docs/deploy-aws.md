@@ -283,23 +283,44 @@ To deploy a later version, repeat with a newer SHA, or set up automatic deploys 
 
 ## Part E: Automatic deploys from GitHub (optional)
 
-Every green build on `main` can deploy itself. GitHub signs in to AWS without stored keys.
+Every green build on `main` can deploy itself. GitHub needs an AWS identity that can do one
+thing only: run the deploy command on your server. Use **option 1** where IAM identity
+providers are available; accounts on the project-based console may show "Feature
+unavailable" for them, so use **option 2** there.
+
+**Option 1: keyless (OpenID Connect).**
 
 1. **IAM → Identity providers → Add provider:** type **OpenID Connect**, provider URL
-   `https://token.actions.githubusercontent.com`, audience `sts.amazonaws.com`. **Add provider.**
+   `https://token.actions.githubusercontent.com`, audience `sts.amazonaws.com`.
 2. **IAM → Roles → Create role → Custom trust policy:** paste
    [`github-deploy-trust.json`](../deploy/aws-ec2/console/github-deploy-trust.json), replacing
    `YOUR_ACCOUNT_ID` (and the repository name if yours differs). Skip adding permissions; name
-   the role `groundline-prod-github-deploy`.
-3. Open the new role → **Add permissions → Create inline policy → JSON:** paste
+   it `groundline-prod-github-deploy`.
+3. Open the role → **Add permissions → Create inline policy → JSON:** paste
    [`github-deploy-policy.json`](../deploy/aws-ec2/console/github-deploy-policy.json) with your
-   region, account ID and instance ID. Name it `deploy-via-ssm`. The role can now do exactly one
-   thing: run commands on this server. **Save:** the role ARN.
-4. On GitHub: **Settings → Environments → New environment** `production`, then add
-   **Environment variables** `AWS_DEPLOY_ROLE_ARN` (the ARN), `AWS_REGION` and
-   `AWS_INSTANCE_ID`. Add yourself under **Required reviewers** if you want to approve each
-   deploy.
-5. Test it: **Actions → Deploy backend to AWS (EC2) → Run workflow**, with a commit SHA.
+   region, account ID and instance ID; name it `deploy-via-ssm`. **Save:** the role ARN.
+
+**Option 2: a deploy user with an access key.**
+
+1. **IAM → Users → Create user:** name `groundline-github-deploy`; leave **console access off**.
+   On **Set permissions**, choose **Attach policies directly**, attach nothing, and create.
+2. Open the user → **Add permissions → Create inline policy → JSON:** paste
+   [`github-deploy-policy.json`](../deploy/aws-ec2/console/github-deploy-policy.json) with your
+   values; name it `deploy-via-ssm`.
+3. **Security credentials → Create access key →** use case **Application running outside
+   AWS** → create. Copy both values now; the secret is shown only once. The key can only
+   start a deploy on this one server; rotate it once a year.
+
+**Then, on GitHub:** **Settings → Secrets and variables → Actions.**
+
+- **Variables** tab: `AWS_REGION` (your region) and `AWS_INSTANCE_ID` (`i-...`), plus
+  `AWS_DEPLOY_ROLE_ARN` for option 1.
+- **Secrets** tab (option 2 only): `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+- Optionally, **Settings → Environments → production → Required reviewers** to approve each
+  deploy.
+
+Test it: **Actions → Deploy backend to AWS (EC2) → Run workflow**, with a full commit SHA.
+From then on, every push to `main` that passes CI deploys automatically.
 
 ## Part F: Connect the web app
 

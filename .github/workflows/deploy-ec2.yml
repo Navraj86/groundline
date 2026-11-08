@@ -4,12 +4,16 @@ name: Deploy backend to AWS (EC2)
 # using the multi-arch images CI published to GHCR. Can also be run by hand for any commit
 # whose images exist. The web app deploys separately through Vercel's Git integration.
 #
-# Setup: docs/deploy-aws.md (console) or docs/deploy-aws-terraform.md. A "production"
-# environment with these variables:
-#   AWS_DEPLOY_ROLE_ARN   ARN of the GitHub deploy role
-#   AWS_REGION            e.g. ap-south-1
-#   AWS_INSTANCE_ID       the instance ID (i-...)
-# Until AWS_DEPLOY_ROLE_ARN is set, this workflow skips itself.
+# Setup: docs/deploy-aws.md (console) or docs/deploy-aws-terraform.md. Repository variables
+# (Settings → Secrets and variables → Actions → Variables):
+#   AWS_REGION            e.g. ap-southeast-2
+#   AWS_INSTANCE_ID       the instance ID (i-...); until it's set, this workflow skips itself
+# and one way to sign in to AWS:
+#   AWS_DEPLOY_ROLE_ARN   variable: a role GitHub assumes through OIDC (preferred), or
+#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY   secrets: a deploy user's access key, for
+#                         accounts where IAM identity providers aren't available.
+# Either identity only needs ssm:SendCommand on this instance (deploy/aws-ec2/console).
+# The job runs in the "production" environment, so required reviewers there gate deploys.
 
 on:
   workflow_run:
@@ -34,7 +38,7 @@ jobs:
   deploy:
     name: Deploy
     if: >-
-      vars.AWS_DEPLOY_ROLE_ARN != '' &&
+      vars.AWS_INSTANCE_ID != '' &&
       (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     environment: production
@@ -45,6 +49,8 @@ jobs:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-access-key-id: ${{ vars.AWS_DEPLOY_ROLE_ARN == '' && secrets.AWS_ACCESS_KEY_ID || '' }}
+          aws-secret-access-key: ${{ vars.AWS_DEPLOY_ROLE_ARN == '' && secrets.AWS_SECRET_ACCESS_KEY || '' }}
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Run the deploy on the instance
