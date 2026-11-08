@@ -1,6 +1,6 @@
 import { UnauthorizedException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
-import { SignJWT } from 'jose';
+import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import type { Env } from '../config/env.js';
 import { TokenVerifier } from './token-verifier.service.js';
 
@@ -47,5 +47,25 @@ describe('TokenVerifier', () => {
 
   it('rejects garbage', async () => {
     await expect(verifier().verify('not-a-jwt')).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('accepts tokens signed with the project asymmetric signing keys, even with a legacy secret set', async () => {
+    const { privateKey, publicKey } = await generateKeyPair('ES256');
+    const jwk = { ...(await exportJWK(publicKey)), kid: 'key-1', alg: 'ES256', use: 'sig' };
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ keys: [jwk] }), { headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const es256 = await new SignJWT({ role: 'authenticated', email: 'asha@example.com' })
+        .setProtectedHeader({ alg: 'ES256', kid: 'key-1' })
+        .setSubject('7a90562a-d492-422a-bc7b-20ec1a1f24c7')
+        .setAudience('authenticated')
+        .setExpirationTime('1h')
+        .sign(privateKey);
+      const claims = await verifier().verify(es256);
+      expect(claims.sub).toBe('7a90562a-d492-422a-bc7b-20ec1a1f24c7');
+      expect(String((fetchMock.mock.calls[0] as unknown[])[0])).toBe('http://localhost:9999/.well-known/jwks.json');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
