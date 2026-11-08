@@ -18,7 +18,7 @@ Built in phases (see the roadmap in the requirements doc).
 | 2 | Subscriptions, plan limits and Dodo Payments | ✅ Done |
 | 3 | Knowledge-base ingestion, embeddings, RAG chat widget | ✅ Done |
 | 4 | Tickets, agent tool calling, human approval | ✅ Done |
-| 5 | Analytics, evaluations, background workers | Planned |
+| 5 | Analytics, evaluations, background workers | ✅ Done |
 | 6 | Docker images, CI/CD, AWS deployment | In progress (CI) |
 
 ## Architecture
@@ -40,7 +40,7 @@ Built in phases (see the roadmap in the requirements doc).
 | Path | What it is |
 | --- | --- |
 | `apps/web` | Next.js App Router frontend: landing page, auth flows, workspace dashboard. Talks only to the API, from the server. |
-| `apps/api` | NestJS core API: auth (proxying Supabase Auth), organizations, members, invitations, billing, audit log. System of record. |
+| `apps/api` | NestJS core API: auth (proxying Supabase Auth), organizations, members, invitations, billing, tickets, agent tools, analytics, evaluations, audit log. System of record. Also runs the BullMQ workers (in-process, or as `dist/worker.js`). |
 | `apps/ai` | Python FastAPI service: document ingestion worker, pgvector retrieval, grounded answers with OpenAI (DeepSeek fallback). |
 | `packages/shared` | Roles, permissions, zod schemas and API types shared by web and API. |
 | `infra` | Database init scripts for the local Docker stack. |
@@ -126,6 +126,49 @@ Each widget conversation counts once against the plan's monthly AI conversation 
   subscriptions) and the **Actions API**, which calls your backend at `POST {baseUrl}/{action}` with
   an `X-Groundline-Signature: t=…,v1=HMAC-SHA256(secret, "t.body")` header. Base URLs must be public
   https addresses in production. Identity and signing secrets are encrypted at rest (AES-256-GCM).
+
+## Analytics
+
+`/o/<workspace>/analytics` reports on any date range, in the viewer's time zone:
+
+- **Conversations:** total, customer messages, how many the assistant resolved without a
+  hand-off (AI resolution rate), and how many were escalated, with a per-day chart.
+- **Answers:** answered, not in the knowledge base, failed, and reply time (average, median, p90).
+- **Tickets:** created by source, resolved, open now, and median time to resolve.
+- **Agent:** runs, tool calls with success rates, and approval outcomes and turnaround.
+- **AI usage and cost:** tokens per model with an estimated cost from list prices
+  (`AI_MODEL_PRICES` overrides them), including quality reviews and evaluation runs.
+- **Answer quality:** average groundedness and relevance of reviewed answers, with links to
+  flagged ones.
+
+Conversation figures cover the website widget; playground tests are excluded, though their
+cost is not. Reports are cached in Redis for a minute.
+
+## Answer quality and evaluations
+
+- **Hallucination monitoring.** A share of live answers (`ANSWER_REVIEW_SAMPLE_RATE`, default
+  25%) is checked by a background job against the full text of the sources it cited. An
+  LLM judge scores groundedness and relevance and lists unsupported claims. Answers below 60%
+  grounded are flagged on the conversation and in analytics.
+- **Evaluation datasets.** Questions with an optional expected answer and expected sources,
+  or marked "should decline". A built-in **Guardrails** set covers off-topic requests,
+  prompt injection and requests for other people's data.
+- **Runs** answer every question the way the live assistant would (without account tools),
+  then score relevance, groundedness, correctness against the expected answer, retrieval hit
+  rate and MRR, and decline accuracy. Runs execute in a worker, resume after a crash, can be
+  cancelled, and are kept with the prompt version, model and judge that produced them, so
+  results can be compared over time.
+- Without a language model configured, a word-overlap heuristic stands in for the judge, and
+  results say so.
+
+## Background jobs
+
+BullMQ queues on Redis: `evaluations`, `answer-reviews` and `maintenance` (expiring overdue
+approvals every five minutes). By default the API process also runs the workers; in
+production run the API with `WORKERS_ENABLED=false` and scale `pnpm --filter @groundline/api
+start:worker` separately. Jobs retry with exponential backoff, and `/health/ready` reports
+Redis and queue depth. Document ingestion stays in the AI service's own worker, woken by
+Postgres `NOTIFY`.
 
 ## Billing
 
@@ -236,3 +279,8 @@ pnpm db:studio    # browse the database with Prisma Studio
 | `GET/POST/PATCH` | `/orgs/:orgId/conversations[/:id[/messages]]` | Inbox, team replies, resolve |
 | `GET/POST` | `/widget/:key`, `/widget/:key/conversations` | Public: config, start a chat |
 | `GET/POST` | `/widget/conversations/:id[/messages\|escalate]` | Public, visitor token required |
+| `GET` | `/orgs/:orgId/analytics?from&to&tz` | Everyone in the workspace |
+| `GET/POST/PATCH/DELETE` | `/orgs/:orgId/evaluations/datasets[/:id[/cases[/import\|:caseId]]]` | Read: everyone · manage: owners and admins |
+| `POST` | `/orgs/:orgId/evaluations/datasets/from-template`, `/datasets/:id/runs` | Owners and admins |
+| `GET/POST` | `/orgs/:orgId/evaluations/runs[/:runId[/cancel]]` | Run history and results |
+| `GET` | `/health`, `/health/ready` | Liveness; readiness with database, Redis and queues |
