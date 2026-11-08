@@ -4,7 +4,7 @@
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build
 #
 # Open http://localhost:3100. Reads secrets from .env; service addresses point at the
-# containers. In AWS the same images run on ECS (see deploy/aws-ecs/terraform).
+# containers. On AWS the same images run on EC2 (deploy/aws-ec2) or ECS (deploy/aws-ecs).
 
 x-app-env: &app-env
   NODE_ENV: production

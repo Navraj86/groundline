@@ -44,9 +44,9 @@ Built in phases (see the roadmap in the requirements doc).
 | `apps/ai` | Python FastAPI service: document ingestion worker, pgvector retrieval, grounded answers with OpenAI (DeepSeek fallback). |
 | `packages/shared` | Roles, permissions, zod schemas and API types shared by web and API. |
 | `infra` | Database init scripts for the local Docker stack. |
-| `deploy/terraform` | AWS infrastructure: ECS Fargate, RDS, ElastiCache, S3, ALB, Secrets Manager. |
+| `deploy/aws-ec2` | Default, low-cost AWS setup: Terraform for one Graviton instance, plus the Compose stack and deploy script it runs. |
+| `deploy/aws-ecs` | Scale-up AWS setup: Terraform for ECS Fargate, RDS, ElastiCache and an ALB, with deploy scripts. |
 | `deploy/k8s` | Kustomize manifests for running on any Kubernetes cluster. |
-| `deploy/scripts` | Push images to ECR and run migrations on ECS. |
 
 ### Key decisions
 
@@ -261,15 +261,20 @@ and plan seed, run as a one-off task) and `ai`. They run as non-root with health
 - **Try a production build locally:**
   `docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build`, then open
   http://localhost:3100.
-- **AWS (ECS Fargate):** Terraform in `deploy/terraform` creates the network, load balancer
-  with HTTPS, RDS Postgres with pgvector, ElastiCache Redis, S3, ECR, ECS services with
-  autoscaling and automatic rollback, alarms, and a GitHub OIDC deploy role.
-  **[Step-by-step guide](docs/deploy-aws.md).**
+- **Default, about US$15–20 a month ([guide](docs/deploy-aws.md)):** the web app on Vercel
+  (free), Postgres with pgvector and sign-in on Supabase (free), and the API, worker, AI
+  service and Redis on one AWS Graviton instance (`t4g.small`) with Docker Compose and Caddy
+  for HTTPS. Terraform in `deploy/aws-ec2` also sets up S3, SSM Parameter Store for secrets,
+  CloudWatch logs and auto-recovery alarms, a monthly budget alert, and a GitHub OIDC role that
+  can only deploy through SSM (no SSH). Every green build on `main` deploys automatically, with
+  rollback if the API doesn't come up.
+- **Scale-up on AWS ([guide](docs/deploy-aws-ecs.md)):** `deploy/aws-ecs` runs the same images
+  on ECS Fargate with RDS, ElastiCache and a load balancer, for when one server isn't enough
+  (about US$150–250 a month).
 - **Kubernetes:** `kubectl apply -k deploy/k8s` with your own managed Postgres, Redis and S3.
-- **CI/CD:** every push builds all images and validates Terraform and the Kubernetes
-  manifests; images from `main` are published to GitHub Container Registry. The **Deploy to
-  AWS** workflow (manual, approval-gated) pushes to ECR, runs migrations, applies Terraform and
-  waits for healthy services.
+- **CI/CD:** every push builds all images natively for amd64 and arm64 and validates both
+  Terraform stacks and the Kubernetes manifests; images from `main` are published to GitHub
+  Container Registry as multi-arch tags.
 
 ## API overview
 
