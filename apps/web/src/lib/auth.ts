@@ -17,7 +17,8 @@ export const getMe = cache(async (): Promise<Me | null> => {
 /** The signed-in user; redirects to the login page when there is no valid session. */
 export async function requireMe(next?: string): Promise<Me> {
   const me = await getMe();
-  if (!me) redirect(next ? `/login?next=${encodeURIComponent(next)}` : "/login");
+  // Through /auth/expired, which clears a session cookie the API rejected (see that route).
+  if (!me) redirect(next ? `/auth/expired?next=${encodeURIComponent(next)}` : "/auth/expired");
   return me;
 }
 
