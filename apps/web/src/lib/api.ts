@@ -1,5 +1,7 @@
 import "server-only";
+import { headers as requestHeaders } from "next/headers";
 import type { ApiErrorBody } from "@groundline/shared";
+import { clientIpHeaders } from "./client-ip";
 import { getAccessToken } from "./session";
 
 export const API_URL = process.env.API_URL ?? "http://localhost:4000";
@@ -43,6 +45,11 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   if (opts.auth !== false) {
     const token = opts.token ?? (await getAccessToken());
     if (token) headers.authorization = `Bearer ${token}`;
+  }
+  try {
+    Object.assign(headers, clientIpHeaders(await requestHeaders()));
+  } catch {
+    // Called outside a request (nothing to forward).
   }
 
   let res: Response;

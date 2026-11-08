@@ -1,13 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AgentModule } from './agent/agent.module.js';
 import { AnalyticsModule } from './analytics/analytics.module.js';
 import { AuditModule } from './audit/audit.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { BillingModule } from './billing/billing.module.js';
 import { ChatModule } from './chat/chat.module.js';
+import { ClientIpThrottlerGuard } from './common/client-ip-throttler.guard.js';
 import { CommonModule } from './common/common.module.js';
 import { validateEnv } from './config/env.js';
 import { EvaluationsModule } from './evaluations/evaluations.module.js';
@@ -52,6 +53,6 @@ import { UsersModule } from './users/users.module.js';
     AnalyticsModule,
     EvaluationsModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [{ provide: APP_GUARD, useClass: ClientIpThrottlerGuard }],
 })
 export class AppModule {}

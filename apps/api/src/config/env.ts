@@ -50,6 +50,8 @@ export const envSchema = z
     WIDGET_TOKEN_SECRET: z.string().default(''),
     // Express "trust proxy" setting, so rate limits see the real client IP behind the web app.
     TRUST_PROXY: z.string().default('loopback'),
+    // Shared with the web app when it runs on another host, so rate limits apply per visitor.
+    PROXY_SECRET: z.string().default(''),
 
     // 32-byte key (base64) for encrypting stored secrets such as connector signing keys.
     ENCRYPTION_KEY: z.string().default(''),

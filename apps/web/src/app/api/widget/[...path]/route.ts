@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { clientIpHeaders } from "@/lib/client-ip";
 
 const API_URL = process.env.API_URL ?? "http://localhost:4000";
 
@@ -23,6 +24,7 @@ async function forward(request: NextRequest, path: string[]): Promise<NextRespon
   // Let the API rate-limit by the visitor's address, not the web server's.
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? request.headers.get("x-real-ip");
   if (ip) headers["x-forwarded-for"] = ip;
+  Object.assign(headers, clientIpHeaders(request.headers));
 
   try {
     const res = await fetch(`${API_URL}/widget/${target}`, {
