@@ -19,7 +19,7 @@ Built in phases (see the roadmap in the requirements doc).
 | 3 | Knowledge-base ingestion, embeddings, RAG chat widget | ✅ Done |
 | 4 | Tickets, agent tool calling, human approval | ✅ Done |
 | 5 | Analytics, evaluations, background workers | ✅ Done |
-| 6 | Docker images, CI/CD, AWS deployment | In progress (CI) |
+| 6 | Docker images, CI/CD, AWS deployment, Kubernetes readiness | ✅ Done (deploy-ready) |
 
 ## Architecture
 
@@ -44,6 +44,9 @@ Built in phases (see the roadmap in the requirements doc).
 | `apps/ai` | Python FastAPI service: document ingestion worker, pgvector retrieval, grounded answers with OpenAI (DeepSeek fallback). |
 | `packages/shared` | Roles, permissions, zod schemas and API types shared by web and API. |
 | `infra` | Database init scripts for the local Docker stack. |
+| `deploy/terraform` | AWS infrastructure: ECS Fargate, RDS, ElastiCache, S3, ALB, Secrets Manager. |
+| `deploy/k8s` | Kustomize manifests for running on any Kubernetes cluster. |
+| `deploy/scripts` | Push images to ECR and run migrations on ECS. |
 
 ### Key decisions
 
@@ -248,6 +251,25 @@ pnpm typecheck
 pnpm test         # vitest (shared, api), pytest (ai)
 pnpm db:studio    # browse the database with Prisma Studio
 ```
+
+## Deployment
+
+Each service ships as a Docker image (`apps/*/Dockerfile`, built from the repository root):
+`web` (Next.js standalone), `api` (also the background worker), `migrate` (Prisma migrations
+and plan seed, run as a one-off task) and `ai`. They run as non-root with health checks.
+
+- **Try a production build locally:**
+  `docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build`, then open
+  http://localhost:3100.
+- **AWS (ECS Fargate):** Terraform in `deploy/terraform` creates the network, load balancer
+  with HTTPS, RDS Postgres with pgvector, ElastiCache Redis, S3, ECR, ECS services with
+  autoscaling and automatic rollback, alarms, and a GitHub OIDC deploy role.
+  **[Step-by-step guide](docs/deploy-aws.md).**
+- **Kubernetes:** `kubectl apply -k deploy/k8s` with your own managed Postgres, Redis and S3.
+- **CI/CD:** every push builds all images and validates Terraform and the Kubernetes
+  manifests; images from `main` are published to GitHub Container Registry. The **Deploy to
+  AWS** workflow (manual, approval-gated) pushes to ECR, runs migrations, applies Terraform and
+  waits for healthy services.
 
 ## API overview
 
