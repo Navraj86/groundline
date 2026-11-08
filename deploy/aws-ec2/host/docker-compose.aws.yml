@@ -1,0 +1,16 @@
+# On EC2: send container logs to CloudWatch Logs (one stream per container) through the
+# instance role. Layered over docker-compose.yml by deploy.sh.
+x-logging: &logging
+  driver: awslogs
+  options:
+    awslogs-region: ${AWS_REGION:?set AWS_REGION}
+    awslogs-group: ${LOG_GROUP:?set LOG_GROUP}
+    tag: "{{.Name}}"
+
+services:
+  caddy: { logging: *logging }
+  api: { logging: *logging }
+  worker: { logging: *logging }
+  ai: { logging: *logging }
+  redis: { logging: *logging }
+  migrate: { logging: *logging }

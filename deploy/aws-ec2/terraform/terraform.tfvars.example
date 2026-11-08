@@ -1,0 +1,16 @@
+# Copy to terraform.tfvars (git-ignored). No secrets here; those go into SSM Parameter Store
+# after the first apply (docs/deploy-aws.md, step 6).
+
+region      = "ap-south-1" # same region as your Supabase project, if you can
+alert_email = "you@example.com"
+acme_email  = "you@example.com"
+
+web_url           = "https://groundline.vercel.app"
+supabase_auth_url = "https://YOUR-PROJECT-REF.supabase.co/auth/v1"
+mail_from         = "Groundline <no-reply@example.com>"
+
+# Leave empty for a free <ip>.sslip.io hostname, or set your own and point an A record at
+# the `public_ip` output.
+api_domain = ""
+
+monthly_budget_usd = 25

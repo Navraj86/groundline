@@ -1,0 +1,86 @@
+# Groundline backend on a single small server (EC2 t4g.small, 2 GB): the API, background
+# worker, AI service and Redis, behind Caddy with automatic HTTPS. The web app runs on
+# Vercel; Postgres and sign-in on Supabase. deploy.sh writes .env and runs this file.
+#
+# Memory limits add up to about 1.7 GB, leaving room for the OS (plus 2 GB of swap).
+
+name: groundline-backend
+
+x-node: &node
+  image: ${IMAGE_REGISTRY:-ghcr.io/navraj86/groundline}/api:${IMAGE_TAG:?set IMAGE_TAG}
+  env_file: [.env]
+  environment: &node-env
+    NODE_ENV: production
+    REDIS_URL: redis://redis:6379
+    AI_SERVICE_URL: http://ai:8000
+    QUEUE_PREFIX: groundline
+    # Caddy, on the Docker network, is the only proxy in front of the API.
+    TRUST_PROXY: uniquelocal
+    NODE_OPTIONS: --max-old-space-size=320
+  depends_on:
+    redis: { condition: service_healthy }
+  restart: unless-stopped
+
+services:
+  caddy:
+    image: caddy:2.10-alpine
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [api]
+    mem_limit: 96m
+    restart: unless-stopped
+
+  api:
+    <<: *node
+    environment:
+      <<: *node-env
+      # Jobs run in the worker container.
+      WORKERS_ENABLED: "false"
+    mem_limit: 448m
+
+  worker:
+    <<: *node
+    command: ["node", "dist/worker.js"]
+    healthcheck: { disable: true }
+    mem_limit: 384m
+
+  ai:
+    image: ${IMAGE_REGISTRY:-ghcr.io/navraj86/groundline}/ai:${IMAGE_TAG:?set IMAGE_TAG}
+    env_file: [.env]
+    environment:
+      # psycopg takes TLS options in libpq form; see AI_DATABASE_URL in .env.
+      DATABASE_URL: ${AI_DATABASE_URL:?set AI_DATABASE_URL}
+      ENVIRONMENT: production
+    mem_limit: 640m
+    restart: unless-stopped
+
+  redis:
+    image: redis:8-alpine
+    # Queued jobs must not be evicted; AOF keeps them across restarts.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "96mb", "--maxmemory-policy", "noeviction"]
+    volumes: [redis-data:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    mem_limit: 160m
+    restart: unless-stopped
+
+  # One-off: `docker compose run --rm migrate` (deploy.sh does this before restarting).
+  migrate:
+    image: ${IMAGE_REGISTRY:-ghcr.io/navraj86/groundline}/migrate:${IMAGE_TAG:?set IMAGE_TAG}
+    env_file: [.env]
+    profiles: [tools]
+    restart: "no"
+
+volumes:
+  caddy-data:
+  caddy-config:
+  redis-data:

@@ -75,11 +75,14 @@ jobs:
       - run: uv run pytest -q
 
   terraform:
-    name: Terraform (AWS)
+    name: Terraform (${{ matrix.stack }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        stack: [aws-ec2, aws-ecs]
     defaults:
       run:
-        working-directory: deploy/terraform
+        working-directory: deploy/${{ matrix.stack }}/terraform
     steps:
       - uses: actions/checkout@v5
       - uses: hashicorp/setup-terraform@v3
