@@ -1,0 +1,24 @@
+# Copy to terraform.tfvars (git-ignored) and adjust. Secrets don't go here; they go in
+# Secrets Manager after the first apply (see docs/deploy-aws.md).
+
+region      = "ap-south-1"
+environment = "prod"
+
+# Your Supabase project's Auth URL (Project Settings → API).
+supabase_auth_url = "https://YOUR-PROJECT-REF.supabase.co/auth/v1"
+
+# HTTPS on your own domain. With a Route 53 hosted zone, the certificate and DNS record are
+# created for you. Leave domain_name empty to test on the load balancer address over HTTP.
+domain_name     = "support.example.com"
+route53_zone_id = "Z0123456789ABCDEFGHIJ"
+# certificate_arn = "arn:aws:acm:ap-south-1:123456789012:certificate/..."  # if DNS is elsewhere
+
+mail_from   = "Groundline <no-reply@example.com>"
+alarm_email = "you@example.com"
+
+# Enables the GitHub Actions deploy role.
+github_repository = "Navraj86/groundline"
+
+# Start small; raise these as traffic grows.
+# db_instance_class = "db.t4g.small"
+# db_multi_az       = true
