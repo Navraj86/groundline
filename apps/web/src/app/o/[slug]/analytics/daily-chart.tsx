@@ -22,8 +22,12 @@ function niceMax(value: number): number {
   return 10 * step;
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "Nov 8". Formatted by hand so server and browser render the same text. */
 function shortDate(date: string): string {
-  return new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+  const [, month, day] = date.split("-").map(Number);
+  return `${MONTHS[month! - 1]} ${day}`;
 }
 
 /** A bar whose top corners are rounded and whose base sits flat on the baseline or segment below. */

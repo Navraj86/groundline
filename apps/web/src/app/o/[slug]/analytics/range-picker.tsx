@@ -42,8 +42,8 @@ export function RangePicker({ from, to }: { from: string; to: string }) {
     }
   }, [params, pathname, router]);
 
-  const end = today();
-  const active = PRESETS.find((p) => to === end && from === minusDays(end, p.days - 1))?.days;
+  // Judged from the range itself, so server and browser agree even across midnight.
+  const active = PRESETS.find((p) => from === minusDays(to, p.days - 1))?.days;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -54,7 +54,10 @@ export function RangePicker({ from, to }: { from: string; to: string }) {
             size="sm"
             variant={active === p.days ? "secondary" : "ghost"}
             aria-pressed={active === p.days}
-            onClick={() => go({ from: minusDays(end, p.days - 1), to: end })}
+            onClick={() => {
+              const end = today();
+              go({ from: minusDays(end, p.days - 1), to: end });
+            }}
           >
             {p.label}
           </Button>
@@ -82,7 +85,6 @@ export function RangePicker({ from, to }: { from: string; to: string }) {
           className="h-8 w-36"
           value={custom.to}
           min={custom.from}
-          max={end}
           onChange={(e) => setCustom({ ...custom, to: e.target.value })}
         />
         <Button size="sm" variant="outline" type="submit">
