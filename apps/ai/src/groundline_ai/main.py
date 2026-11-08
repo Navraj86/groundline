@@ -15,6 +15,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 
 from groundline_ai import __version__
+from groundline_ai.agent import AgentRequest, AgentResponse, respond
 from groundline_ai.answering import AnswerRequest, AnswerResponse, answer
 from groundline_ai.config import get_settings
 from groundline_ai.db import close_pool, open_pool
@@ -69,3 +70,9 @@ def health() -> dict[str, str]:
 async def create_answer(request: AnswerRequest) -> AnswerResponse:
     """Answers a customer question from the organization's knowledge base."""
     return await answer(request, get_settings())
+
+
+@app.post("/v1/agent/respond", tags=["agent"], dependencies=[Depends(require_service_token)])
+async def agent_respond(request: AgentRequest) -> AgentResponse:
+    """One agent step: an answer, or tool calls for the core API to vet and run."""
+    return await respond(request, get_settings())

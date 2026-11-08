@@ -7,7 +7,8 @@ OpenAI SDK, so the request shape is identical.
 
 import logging
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
 
 from openai import APIConnectionError, APIStatusError, APITimeoutError, AsyncOpenAI
 
@@ -28,6 +29,14 @@ class Provider:
 
 
 @dataclass
+class ToolCallRequest:
+    call_id: str
+    name: str
+    #: JSON-encoded arguments, exactly as the model produced them.
+    arguments: str
+
+
+@dataclass
 class Completion:
     text: str
     provider: str
@@ -36,6 +45,7 @@ class Completion:
     output_tokens: int | None
     latency_ms: int
     fell_back: bool
+    tool_calls: list[ToolCallRequest] = field(default_factory=list)
 
 
 def build_providers(settings: Settings) -> list[Provider]:
@@ -78,9 +88,11 @@ async def complete(
     providers: list[Provider],
     *,
     instructions: str,
-    messages: list[dict[str, str]],
+    messages: list[dict[str, Any]],
+    tools: list[dict[str, Any]] | None = None,
     max_output_tokens: int = 2000,
 ) -> Completion:
+    """One model turn. With `tools`, the model may answer with tool calls instead of text."""
     if not providers:
         raise LLMUnavailable(
             "No language model is configured. Set OPENAI_API_KEY or DEEPSEEK_API_KEY."
@@ -94,6 +106,7 @@ async def complete(
                 instructions=instructions,
                 input=messages,
                 max_output_tokens=max_output_tokens,
+                **({"tools": tools} if tools else {}),
             )
         except _FALLBACK_ERRORS as err:
             status = getattr(err, "status_code", None)
@@ -102,8 +115,13 @@ async def complete(
             log.log(level, "%s failed (%s): %s", provider.name, status or type(err).__name__, err)
             continue
 
+        tool_calls = [
+            ToolCallRequest(call_id=item.call_id, name=item.name, arguments=item.arguments or "{}")
+            for item in (getattr(response, "output", None) or [])
+            if getattr(item, "type", None) == "function_call"
+        ]
         text = (response.output_text or "").strip()
-        if not text:
+        if not text and not tool_calls:
             log.warning("%s returned no text (status %s)", provider.name, response.status)
             continue
         usage = response.usage
@@ -115,5 +133,6 @@ async def complete(
             output_tokens=usage.output_tokens if usage else None,
             latency_ms=int((time.perf_counter() - started) * 1000),
             fell_back=position > 0,
+            tool_calls=tool_calls,
         )
     raise LLMUnavailable("All language model providers failed.")
