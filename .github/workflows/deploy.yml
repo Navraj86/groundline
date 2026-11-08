@@ -1,0 +1,94 @@
+name: Deploy to AWS
+
+# Manual: Actions → "Deploy to AWS" → Run workflow. Runs in the "production" environment,
+# so its required reviewers approve each deploy. Setup: docs/deploy-aws.md.
+#
+# Environment variables (Settings → Environments → production → Variables):
+#   AWS_DEPLOY_ROLE_ARN   output github_deploy_role_arn of the Terraform stack
+#   AWS_REGION            e.g. ap-south-1
+#   TF_BACKEND_CONFIG     contents of backend.hcl
+#   TF_VARS               contents of terraform.tfvars
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit, branch or tag to deploy
+        default: main
+        required: true
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: Build, migrate and deploy
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref }}
+
+      - id: sha
+        run: echo "tag=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push images
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+        run: deploy/scripts/push-images.sh "${{ steps.sha.outputs.tag }}"
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.x
+          terraform_wrapper: false
+
+      - name: Terraform init
+        working-directory: deploy/terraform
+        env:
+          TF_BACKEND_CONFIG: ${{ vars.TF_BACKEND_CONFIG }}
+          TF_VARS: ${{ vars.TF_VARS }}
+        run: |
+          printf '%s\n' "$TF_BACKEND_CONFIG" > backend.hcl
+          printf '%s\n' "$TF_VARS" > terraform.tfvars
+          terraform init -input=false -backend-config=backend.hcl
+
+      # Migrations run before any new code serves traffic. They must stay backward
+      # compatible with the running version (add columns before using them, etc.).
+      - name: Run database migrations
+        working-directory: deploy/terraform
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          TF_VAR_image_tag: ${{ steps.sha.outputs.tag }}
+        run: |
+          terraform apply -input=false -auto-approve -target=aws_ecs_task_definition.migrate
+          ../scripts/migrate.sh
+
+      - name: Deploy services
+        working-directory: deploy/terraform
+        env:
+          TF_VAR_image_tag: ${{ steps.sha.outputs.tag }}
+        run: terraform apply -input=false -auto-approve
+
+      - name: Wait for services to become stable
+        working-directory: deploy/terraform
+        run: |
+          cluster=$(terraform output -raw ecs_cluster)
+          aws ecs wait services-stable --cluster "$cluster" --services web api worker ai
+          echo "Deployed ${{ steps.sha.outputs.tag }} to $(terraform output -raw app_url)" >> "$GITHUB_STEP_SUMMARY"
