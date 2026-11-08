@@ -33,12 +33,14 @@ export class QueueService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly workers: Worker[] = [];
   private readonly handlers = new Map<QueueName, Map<string, JobHandler>>();
   private readonly schedules: { queue: QueueName; id: string; everyMs: number }[] = [];
+  private readonly prefix: string;
   readonly workersEnabled: boolean;
 
   constructor(config: ConfigService<Env, true>) {
     // BullMQ's blocking commands need unlimited retries on the worker connection.
     this.connection = { url: config.get('REDIS_URL', { infer: true }), maxRetriesPerRequest: null };
     this.workersEnabled = config.get('WORKERS_ENABLED', { infer: true });
+    this.prefix = config.get('QUEUE_PREFIX', { infer: true });
   }
 
   queue(name: QueueName): Queue {
@@ -46,7 +48,7 @@ export class QueueService implements OnApplicationBootstrap, OnModuleDestroy {
     if (!queue) {
       queue = new Queue(name, {
         connection: this.connection,
-        prefix: 'groundline',
+        prefix: this.prefix,
         defaultJobOptions: DEFAULT_JOB_OPTIONS,
       });
       queue.on('error', (err) => this.logger.warn(`Queue ${name}: ${err.message}`));
@@ -81,7 +83,7 @@ export class QueueService implements OnApplicationBootstrap, OnModuleDestroy {
           if (!handler) throw new Error(`No handler for ${name}/${job.name}`);
           return handler(job.data, job);
         },
-        { connection: this.connection, prefix: 'groundline', concurrency: CONCURRENCY[name] },
+        { connection: this.connection, prefix: this.prefix, concurrency: CONCURRENCY[name] },
       );
       worker.on('failed', (job, err) =>
         this.logger.warn(`Job ${name}/${job?.name} ${job?.id} failed (attempt ${job?.attemptsMade}): ${err.message}`),

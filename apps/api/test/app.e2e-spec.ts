@@ -26,7 +26,9 @@ describe('Health (e2e)', () => {
     return request(app.getHttpServer()).get('/health').expect(200).expect({ status: 'ok' });
   });
 
-  it('GET /health/ready checks the database', () => {
-    return request(app.getHttpServer()).get('/health/ready').expect(200).expect({ status: 'ok', database: 'up' });
+  it('GET /health/ready checks the database and Redis', async () => {
+    const res = await request(app.getHttpServer()).get('/health/ready').expect(200);
+    expect(res.body).toMatchObject({ status: 'ok', database: 'up', redis: 'up' });
+    expect(res.body.queues).toHaveProperty('evaluations');
   });
 });

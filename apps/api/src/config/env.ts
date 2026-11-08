@@ -17,6 +17,8 @@ export const envSchema = z
       .enum(['true', 'false'])
       .default('true')
       .transform((v) => v === 'true'),
+    // Namespace for queue keys in Redis, so separate environments can share one server.
+    QUEUE_PREFIX: z.string().regex(/^[\w-]+$/).default('groundline'),
 
     // Supabase Auth. Locally this is the GoTrue container; in production a Supabase project
     // (https://<ref>.supabase.co/auth/v1).
