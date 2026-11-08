@@ -116,13 +116,14 @@ resource "aws_instance" "api" {
     cpu_credits = "standard"
   }
 
-  user_data = templatefile("${path.module}/user-data.sh.tftpl", {
-    environment = var.environment
-    region      = var.region
-    param_path  = local.param_path
-    log_group   = aws_cloudwatch_log_group.api.name
-    repository  = var.repository
-  })
+  # The same script the console guide pastes in, with its two settings filled in.
+  user_data = replace(
+    replace(
+      file("${path.module}/../host/user-data.sh"),
+      "GROUNDLINE_ENVIRONMENT=\"prod\"", "GROUNDLINE_ENVIRONMENT=\"${var.environment}\"",
+    ),
+    "GROUNDLINE_REPOSITORY=\"Navraj86/groundline\"", "GROUNDLINE_REPOSITORY=\"${var.repository}\"",
+  )
 
   tags = { Name = local.name }
 

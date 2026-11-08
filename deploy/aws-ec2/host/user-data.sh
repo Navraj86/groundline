@@ -1,8 +1,19 @@
 #!/bin/bash
 # First-boot setup for the Groundline backend instance (Amazon Linux 2023, arm64).
+# Paste into EC2 → Launch instance → Advanced details → User data (Terraform passes it too).
 # Installs Docker with Compose, adds swap, and installs the `groundline-deploy` command.
-# Nothing is deployed here: the first deploy runs once the secrets are filled in.
+# Nothing is deployed here: the first deploy runs once the secrets are in Parameter Store.
+
+# ---- Settings (the only lines you might edit) -----------------------------------------
+GROUNDLINE_ENVIRONMENT="prod"                 # parameters live under /groundline/<this>/
+GROUNDLINE_REPOSITORY="Navraj86/groundline"   # GitHub repo the deploy files come from
+# -----------------------------------------------------------------------------------------
+
 set -euxo pipefail
+
+# Region of this instance, from the instance metadata service.
+imds_token=$(curl -fsS -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
+region=$(curl -fsS -H "X-aws-ec2-metadata-token: $imds_token" http://169.254.169.254/latest/meta-data/placement/region)
 
 dnf install -y docker
 systemctl enable --now docker
@@ -30,22 +41,22 @@ cat > /etc/docker/daemon.json <<'JSON'
 JSON
 systemctl restart docker
 
-cat > /etc/groundline.conf <<'CONF'
-ENVIRONMENT=${environment}
-AWS_REGION=${region}
-PARAM_PATH=${param_path}
-LOG_GROUP=${log_group}
-REPOSITORY=${repository}
+cat > /etc/groundline.conf <<CONF
+ENVIRONMENT=$GROUNDLINE_ENVIRONMENT
+AWS_REGION=$region
+PARAM_PATH=/groundline/$GROUNDLINE_ENVIRONMENT/
+LOG_GROUP=/groundline/$GROUNDLINE_ENVIRONMENT
+REPOSITORY=$GROUNDLINE_REPOSITORY
 CONF
 
 mkdir -p /opt/groundline
 
-# `groundline-deploy <tag>` runs the deploy script from the same commit as the images.
+# `groundline-deploy <commit-sha>` runs the deploy script from the same commit as the images.
 cat > /usr/local/bin/groundline-deploy <<'SH'
 #!/bin/bash
 set -euo pipefail
 source /etc/groundline.conf
-tag="$${1:?usage: groundline-deploy <image-tag>}"
+tag="${1:?usage: groundline-deploy <commit-sha>}"
 curl -fsSL --retry 3 "https://raw.githubusercontent.com/$REPOSITORY/$tag/deploy/aws-ec2/host/deploy.sh" -o /opt/groundline/deploy.sh
 exec bash /opt/groundline/deploy.sh "$tag"
 SH
