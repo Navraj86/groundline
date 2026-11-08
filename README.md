@@ -17,7 +17,7 @@ Built in phases (see the roadmap in the requirements doc).
 | 1 | Auth, organizations, roles, invitations, dashboard, database foundation | ✅ Done |
 | 2 | Subscriptions, plan limits and Dodo Payments | ✅ Done |
 | 3 | Knowledge-base ingestion, embeddings, RAG chat widget | ✅ Done |
-| 4 | Tickets, agent tool calling, human approval | Planned |
+| 4 | Tickets, agent tool calling, human approval | ✅ Done |
 | 5 | Analytics, evaluations, background workers | Planned |
 | 6 | Docker images, CI/CD, AWS deployment | In progress (CI) |
 
@@ -105,6 +105,27 @@ Admins can't grant, change or remove the Owner role, and a workspace always keep
    the inbox.
 
 Each widget conversation counts once against the plan's monthly AI conversation limit.
+
+## Tickets, agent tools and approvals
+
+- **Tickets** are numbered per workspace (#1001, …) with status, priority, assignee, internal notes
+  and a full history. They're opened when a customer asks for a person, when the assistant uses
+  `create_ticket`, or by staff.
+- **Agent tools:** `create_ticket`, `get_customer_profile`, `get_subscription`, `list_orders`,
+  `request_refund`, `cancel_subscription`. The AI service only *proposes* tool calls; the API's
+  `ToolExecutor` runs a call only if the tool is registered and enabled, the input validates, and,
+  for account tools, the conversation belongs to a **verified customer**. Everything else is
+  blocked, and every call is logged with its input, result and timing.
+- **Approvals:** refunds and cancellations never run directly. They become approval requests that
+  only owners and admins can approve; approval runs the action and posts the outcome to the
+  customer's chat. Requests expire after 72 hours.
+- **Identity verification:** your server signs a short-lived HS256 JWT (`sub`, `email`, `name`) with
+  the workspace's identity secret and passes it to the widget (`data-user-token` or
+  `window.Groundline.identify(token)`). Account tools act for that customer only.
+- **Connectors:** a built-in **sandbox store** (deterministic demo customers, orders and
+  subscriptions) and the **Actions API**, which calls your backend at `POST {baseUrl}/{action}` with
+  an `X-Groundline-Signature: t=…,v1=HMAC-SHA256(secret, "t.body")` header. Base URLs must be public
+  https addresses in production. Identity and signing secrets are encrypted at rest (AES-256-GCM).
 
 ## Billing
 
@@ -206,6 +227,10 @@ pnpm db:studio    # browse the database with Prisma Studio
 | `POST` | `/orgs/:orgId/billing/checkout`, `/change-plan`, `/cancel`, `/resume`, `/portal` | `billing:manage` (owners) |
 | `POST` | `/orgs/:orgId/billing/sync` | Reconcile with Dodo Payments |
 | `POST` | `/webhooks/dodo` | Signature-verified, idempotent |
+| `GET/POST/PATCH` | `/orgs/:orgId/tickets[/:number[/notes]]` | Staff |
+| `GET/POST` | `/orgs/:orgId/approvals`, `/approvals/:id/decision` | Read: staff · decide: owners and admins |
+| `GET/PATCH` | `/orgs/:orgId/agent/tools`, `GET /agent/tool-calls` | Tool settings and call log |
+| `GET/PUT/POST/DELETE` | `/orgs/:orgId/integrations/*`, `/orgs/:orgId/identity` | Owners |
 | `GET/POST/PATCH/DELETE` | `/orgs/:orgId/knowledge[/files\|urls\|text\|:id[/reprocess]]` | Knowledge sources |
 | `GET/PATCH/POST` | `/orgs/:orgId/assistant[/rotate-key]` | Assistant settings and widget key |
 | `GET/POST/PATCH` | `/orgs/:orgId/conversations[/:id[/messages]]` | Inbox, team replies, resolve |
