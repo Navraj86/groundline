@@ -261,7 +261,7 @@ and plan seed, run as a one-off task) and `ai`. They run as non-root with health
 - **Try a production build locally:**
   `docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build`, then open
   http://localhost:3100.
-- **Default, about US$15–20 a month ([guide](docs/deploy-aws.md)):** the web app on Vercel
+- **Default, about US$15–20 a month ([console guide](docs/deploy-aws.md), or [with Terraform](docs/deploy-aws-terraform.md)):** the web app on Vercel
   (free), Postgres with pgvector and sign-in on Supabase (free), and the API, worker, AI
   service and Redis on one AWS Graviton instance (`t4g.small`) with Docker Compose and Caddy
   for HTTPS. Terraform in `deploy/aws-ec2` also sets up S3, SSM Parameter Store for secrets,
