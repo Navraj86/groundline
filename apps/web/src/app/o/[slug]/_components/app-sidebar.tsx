@@ -65,7 +65,7 @@ const supportNav: NavItem[] = [
   { title: "Assistant", href: "/assistant", icon: Bot, permission: "knowledge:read" },
   { title: "Tickets", href: "/tickets", icon: Ticket, permission: "tickets:manage" },
   { title: "Approvals", href: "/approvals", icon: ShieldCheck, permission: "approvals:read" },
-  { title: "Analytics", href: "/analytics", icon: BarChart3, permission: "analytics:read", soon: true },
+  { title: "Analytics", href: "/analytics", icon: BarChart3, permission: "analytics:read" },
 ];
 
 const workspaceNav: NavItem[] = [
