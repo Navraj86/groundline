@@ -13,15 +13,21 @@ import type {
   ToolCallView,
 } from '@groundline/shared';
 import { toToolCallView } from '../agent/agent.controller.js';
+import { ToolExecutor } from '../agent/tool-executor.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { EntitlementsService, PlanLimitException } from '../billing/entitlements.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { TicketsService } from '../tickets/tickets.service.js';
-import { AiClient } from './ai-client.service.js';
+import { AiClient, type AgentStepRequest, type AgentStepResult } from './ai-client.service.js';
 import { readAssistantSettings } from './assistant.service.js';
 
 const HISTORY_LIMIT = 12;
+// Model turns per reply (each may request tools) and tool calls honored per turn.
+const MAX_AGENT_STEPS = 4;
+const MAX_TOOL_CALLS_PER_STEP = 3;
+const STEP_LIMIT_REPLY =
+  "Sorry, I couldn't finish that request. You can ask to talk to a person and the team will follow up.";
 const ESCALATED_NOTICE = "Thanks, you're now in the queue for our team. Someone will reply right here.";
 const LIMIT_REACHED_REPLY =
   "Our assistant can't take new conversations right now. Leave your email and someone from the team will get back to you.";
@@ -39,6 +45,7 @@ export class ChatService {
     private readonly entitlements: EntitlementsService,
     private readonly audit: AuditService,
     private readonly tickets: TicketsService,
+    private readonly toolExecutor: ToolExecutor,
   ) {}
 
   // ---- Widget (customer-facing) ----------------------------------------------------
@@ -91,7 +98,8 @@ export class ChatService {
     }
 
     const reply = await this.generateReply(conversation, content);
-    const status: ConversationStatus = conversation.status === 'RESOLVED' ? 'OPEN' : conversation.status;
+    // Tools can change the conversation (create_ticket hands it to the team), so re-read it.
+    const { status } = await this.prisma.conversation.findUniqueOrThrow({ where: { id: conversationId }, select: { status: true } });
     return { message: toMessage(customerMessage, false), reply: toMessage(reply, false), status };
   }
 
@@ -253,12 +261,54 @@ export class ChatService {
     // The newest message is the question itself; send the turns before it as history.
     const previous = history.slice(1).reverse();
 
-    const result = await this.ai.answer({
-      organizationId,
-      question,
-      history: previous.map((m) => ({ role: m.role, content: m.content })),
-      assistant: { name: settings.name, companyName: org.name, instructions: settings.instructions },
+    const started = Date.now();
+    const tools = await this.toolExecutor.availableTools(organizationId, conversationId);
+    // Created up front so the tool calls of this reply can reference it.
+    const run = await this.prisma.agentRun.create({
+      data: { organizationId, conversationId, status: 'FAILED', steps: 0, latencyMs: 0 },
     });
+    const steps: AgentStepRequest['steps'] = [];
+    const usage = { input: 0, output: 0 };
+    let result: AgentStepResult | null = null;
+
+    for (let step = 1; step <= MAX_AGENT_STEPS; step++) {
+      const response = await this.ai.respond({
+        organizationId,
+        question,
+        history: previous.map((m) => ({ role: m.role, content: m.content })),
+        assistant: { name: settings.name, companyName: org.name, instructions: settings.instructions },
+        tools,
+        steps,
+        customerSignedIn: conversation.customerId !== null,
+      });
+      usage.input += response.input_tokens ?? 0;
+      usage.output += response.output_tokens ?? 0;
+      if (response.status !== 'TOOL_CALLS') {
+        result = response;
+        break;
+      }
+      // The model only proposes; the executor decides what actually runs (BR-008).
+      for (const call of response.tool_calls.slice(0, MAX_TOOL_CALLS_PER_STEP)) {
+        const outcome = await this.toolExecutor.execute(
+          { organizationId, conversationId, agentRunId: run.id },
+          { callId: call.call_id, name: call.name, arguments: call.arguments },
+        );
+        steps.push({ ...call, output: JSON.stringify(outcome.output) });
+      }
+      result = response;
+    }
+    if (!result || result.status === 'TOOL_CALLS') {
+      result = {
+        ...(result ?? { provider: null, model: null, sources: [] }),
+        status: 'ERROR',
+        answer: STEP_LIMIT_REPLY,
+        tool_calls: [],
+        sources: [],
+        input_tokens: null,
+        output_tokens: null,
+        latency_ms: Date.now() - started,
+      } as AgentStepResult;
+    }
 
     const sources: AnswerSource[] = result.sources.map((s) => ({
       index: s.index,
@@ -268,18 +318,33 @@ export class ChatService {
       pages: s.pages,
       snippet: s.snippet,
     }));
-    return this.saveReply(conversation, {
+    const latencyMs = Date.now() - started;
+    const message = await this.saveReply(conversation, {
       content: result.answer,
-      answerStatus: result.status,
+      answerStatus: result.status as 'ANSWERED' | 'INSUFFICIENT_CONTEXT' | 'ERROR',
       sources,
       provider: result.provider,
       model: result.model,
-      inputTokens: result.input_tokens,
-      outputTokens: result.output_tokens,
-      latencyMs: result.latency_ms,
+      inputTokens: usage.input || null,
+      outputTokens: usage.output || null,
+      latencyMs,
       // The conversation has been counted against the monthly limit; don't count it again.
       engaged: true,
     });
+    await this.prisma.agentRun.update({
+      where: { id: run.id },
+      data: {
+        messageId: message.id,
+        status: result.status === 'ERROR' ? 'FAILED' : 'COMPLETED',
+        steps: steps.length,
+        provider: result.provider,
+        model: result.model,
+        inputTokens: usage.input,
+        outputTokens: usage.output,
+        latencyMs,
+      },
+    });
+    return message;
   }
 
   private async saveReply(

@@ -30,6 +30,17 @@ export interface AnswerResult {
   latency_ms: number;
 }
 
+export interface AgentStepRequest extends AnswerRequest {
+  tools: { name: string; description: string; parameters: Record<string, unknown> }[];
+  steps: { call_id: string; name: string; arguments: string; output: string }[];
+  customerSignedIn: boolean;
+}
+
+export interface AgentStepResult extends Omit<AnswerResult, 'status'> {
+  status: AnswerResult['status'] | 'TOOL_CALLS';
+  tool_calls: { call_id: string; name: string; arguments: string }[];
+}
+
 const UNAVAILABLE =
   "Sorry, I'm having trouble answering right now. You can ask to speak with someone from the team and they'll follow up.";
 
@@ -43,6 +54,50 @@ export class AiClient {
   constructor(config: ConfigService<Env, true>) {
     this.baseUrl = config.get('AI_SERVICE_URL', { infer: true }).replace(/\/+$/, '');
     this.token = config.get('AI_SERVICE_TOKEN', { infer: true });
+  }
+
+  /** One agent step: the final answer, or tool calls for us to vet and run. */
+  async respond(request: AgentStepRequest): Promise<AgentStepResult> {
+    const started = Date.now();
+    try {
+      const res = await fetch(`${this.baseUrl}/v1/agent/respond`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          ...(this.token ? { authorization: `Bearer ${this.token}` } : {}),
+        },
+        body: JSON.stringify({
+          organization_id: request.organizationId,
+          question: request.question,
+          history: request.history,
+          assistant: {
+            name: request.assistant.name,
+            company_name: request.assistant.companyName,
+            instructions: request.assistant.instructions,
+          },
+          tools: request.tools,
+          steps: request.steps,
+          customer_signed_in: request.customerSignedIn,
+        }),
+        signal: AbortSignal.timeout(45_000),
+      });
+      if (!res.ok) throw new Error(`AI service responded ${res.status}: ${await res.text()}`);
+      const body = (await res.json()) as AgentStepResult;
+      return { ...body, tool_calls: body.tool_calls ?? [], sources: body.sources ?? [] };
+    } catch (err) {
+      this.logger.error(`Agent step failed: ${(err as Error).message}`);
+      return {
+        status: 'ERROR',
+        answer: UNAVAILABLE,
+        tool_calls: [],
+        sources: [],
+        provider: null,
+        model: null,
+        input_tokens: null,
+        output_tokens: null,
+        latency_ms: Date.now() - started,
+      };
+    }
   }
 
   async answer(request: AnswerRequest): Promise<AnswerResult> {

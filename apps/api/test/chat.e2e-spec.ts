@@ -4,20 +4,21 @@ import { SignJWT } from 'jose';
 import { randomBytes, randomUUID } from 'node:crypto';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
-import type { AiClient as AiClientType, AnswerRequest } from '../src/chat/ai-client.service.js';
+import type { AgentStepRequest, AiClient as AiClientType } from '../src/chat/ai-client.service.js';
 import type { PrismaService as PrismaServiceType } from '../src/prisma/prisma.service.js';
 import { ensureFreePlan } from './helpers.js';
 
 process.env.SUPABASE_JWT_SECRET ||= 'e2e-secret-for-signing-test-access-tokens-0123456789';
 
-const answers: AnswerRequest[] = [];
-const fakeAi: Pick<AiClientType, 'answer'> = {
-  async answer(req) {
+const answers: AgentStepRequest[] = [];
+const fakeAi: Pick<AiClientType, 'respond'> = {
+  async respond(req) {
     answers.push(req);
     if (req.question.includes('unknown')) {
       return {
         status: 'INSUFFICIENT_CONTEXT',
         answer: "I couldn't find that.",
+        tool_calls: [],
         sources: [],
         provider: null,
         model: null,
@@ -29,6 +30,7 @@ const fakeAi: Pick<AiClientType, 'answer'> = {
     return {
       status: 'ANSWERED',
       answer: 'Refunds are available within 30 days [1].',
+      tool_calls: [],
       sources: [
         {
           index: 1,
