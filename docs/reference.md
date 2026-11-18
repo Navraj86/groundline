@@ -1,8 +1,7 @@
 # Groundline reference
 
 The detailed companion to the [README](../README.md): design decisions, every feature, local
-setup, deployment options and the API surface. Business requirements are in
-[requirements.md](requirements.md).
+setup, deployment options and the API surface.
 
 ## Design decisions
 

@@ -268,5 +268,4 @@ docs/           Requirements, reference and deployment guides
 ## Further reading
 
 - [Reference](docs/reference.md): design decisions, every feature, billing setup, API endpoints
-- [Business requirements](docs/requirements.md): the product brief this was built against
 - Deployment guides: [AWS console](docs/deploy-aws.md) · [Terraform](docs/deploy-aws-terraform.md) · [ECS Fargate](docs/deploy-aws-ecs.md)
