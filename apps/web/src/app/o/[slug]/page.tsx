@@ -1,4 +1,4 @@
-import { ArrowRight, BookOpen, CheckCircle2, Circle, MessagesSquare, Ticket, Users } from "lucide-react";
+import { ArrowRight, CheckCircle2, Circle } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { hasPermission, type OrganizationOverview } from "@groundline/shared";
@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { requireOrg } from "@/lib/auth";
 import { ActivityList } from "./_components/activity-list";
 import { PageBody, PageHeader } from "./_components/page-header";
+import { StatStrip } from "./_components/stat-strip";
 
 export const metadata: Metadata = { title: "Overview" };
 
@@ -19,10 +20,10 @@ export default async function OverviewPage({ params }: PageProps<"/o/[slug]">) {
   const firstName = me.fullName?.split(" ")[0];
 
   const stats = [
-    { label: "Team members", value: overview.members, icon: Users, hint: plural(overview.pendingInvitations, "pending invitation") },
-    { label: "Knowledge sources", value: overview.knowledgeSources, icon: BookOpen, hint: "Ready for the assistant" },
-    { label: "Conversations", value: overview.conversations, icon: MessagesSquare, hint: "Last 30 days" },
-    { label: "Needs a human", value: overview.openTickets, icon: Ticket, hint: "Escalated conversations" },
+    { label: "Team members", value: overview.members, hint: plural(overview.pendingInvitations, "pending invitation") },
+    { label: "Knowledge sources", value: overview.knowledgeSources, hint: "Ready for the assistant" },
+    { label: "Conversations", value: overview.conversations, hint: "Last 30 days" },
+    { label: "Needs a human", value: overview.openTickets, hint: "Escalated conversations" },
   ];
 
   const steps = [
@@ -57,20 +58,7 @@ export default async function OverviewPage({ params }: PageProps<"/o/[slug]">) {
         description={firstName ? `Welcome back, ${firstName}. Here's how ${org.name} is doing.` : undefined}
       />
       <PageBody>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {stats.map(({ label, value, icon: Icon, hint }) => (
-            <Card key={label} className="gap-2">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                <CardDescription>{label}</CardDescription>
-                <Icon className="size-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-semibold tabular-nums">{value}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <StatStrip stats={stats} />
 
         <div className="grid gap-4 lg:grid-cols-5">
           <Card className="lg:col-span-3">
@@ -79,13 +67,26 @@ export default async function OverviewPage({ params }: PageProps<"/o/[slug]">) {
               <CardDescription>
                 {completed} of {steps.length} steps complete
               </CardDescription>
+              <div
+                role="progressbar"
+                aria-label="Setup progress"
+                aria-valuemin={0}
+                aria-valuemax={steps.length}
+                aria-valuenow={completed}
+                className="mt-3 h-1 overflow-hidden rounded-full bg-muted"
+              >
+                <div
+                  className="h-full origin-left rounded-full bg-signal transition-transform duration-500 ease-out"
+                  style={{ transform: `scaleX(${completed / steps.length})` }}
+                />
+              </div>
             </CardHeader>
             <CardContent>
               <ol className="space-y-5">
                 {steps.map((step) => (
                   <li key={step.title} className="flex gap-3">
                     {step.done ? (
-                      <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-600" />
+                      <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-signal" />
                     ) : (
                       <Circle className="mt-0.5 size-5 shrink-0 text-muted-foreground/50" />
                     )}
@@ -96,8 +97,9 @@ export default async function OverviewPage({ params }: PageProps<"/o/[slug]">) {
                       {!step.done && <p className="text-sm text-muted-foreground">{step.description}</p>}
                       {!step.done && step.action && (
                         <Button asChild size="sm" variant="outline" className="mt-2">
-                          <Link href={step.action.href}>
-                            {step.action.label} <ArrowRight />
+                          <Link href={step.action.href} className="group/step">
+                            {step.action.label}
+                            <ArrowRight className="transition-transform duration-200 ease-out group-hover/step:translate-x-0.5" />
                           </Link>
                         </Button>
                       )}

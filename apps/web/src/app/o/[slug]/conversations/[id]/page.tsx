@@ -62,7 +62,9 @@ export default async function ConversationPage({ params }: PageProps<"/o/[slug]/
         title={conversation.title ?? "Conversation"}
         description={
           <span className="flex flex-wrap items-center gap-2">
-            <Badge variant={badge.variant}>{badge.label}</Badge>
+            <Badge variant={badge.variant} className={badge.className}>
+              {badge.label}
+            </Badge>
             {conversation.channel === "PLAYGROUND" && <Badge variant="outline">Test chat</Badge>}
             <span>Started {formatDateTime(conversation.createdAt)}</span>
           </span>

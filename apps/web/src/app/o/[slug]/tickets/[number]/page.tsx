@@ -20,7 +20,7 @@ import { api, ApiError } from "@/lib/api";
 import { requireOrg } from "@/lib/auth";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { PageBody, PageHeader } from "../../_components/page-header";
-import { STATUS_VARIANT } from "../labels";
+import { STATUS_CLASS } from "../labels";
 import { NoteForm, TicketFields } from "./ticket-controls";
 
 export async function generateMetadata({ params }: PageProps<"/o/[slug]/tickets/[number]">): Promise<Metadata> {
@@ -53,7 +53,7 @@ export default async function TicketPage({ params }: PageProps<"/o/[slug]/ticket
         title={`#${ticket.number} ${ticket.subject}`}
         description={
           <span className="flex flex-wrap items-center gap-2">
-            <Badge variant={STATUS_VARIANT[ticket.status]}>{TICKET_STATUS_LABELS[ticket.status]}</Badge>
+            <Badge variant="outline" className={STATUS_CLASS[ticket.status]}>{TICKET_STATUS_LABELS[ticket.status]}</Badge>
             <span>{TICKET_SOURCE_LABELS[ticket.source]}</span>
             <span>· opened {formatRelative(ticket.createdAt)}</span>
           </span>

@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 import { requireOrg } from "@/lib/auth";
 import { formatRelative } from "@/lib/format";
 import { PageBody, PageHeader } from "../_components/page-header";
+import { EmptyState } from "../_components/empty-state";
 import { AddSourceDialog } from "./add-source-dialog";
 import { RefreshWhileProcessing, SourceActions } from "./source-actions";
 
@@ -45,20 +46,12 @@ export default async function KnowledgePage({ params }: PageProps<"/o/[slug]/kno
       />
       <PageBody>
         {sources.length === 0 ? (
-          <div className="flex flex-col items-center rounded-xl border border-dashed px-6 py-16 text-center">
-            <div className="mb-4 rounded-full bg-muted p-3">
-              <BookOpen className="size-6 text-muted-foreground" />
-            </div>
-            <h2 className="text-lg font-semibold">Add your first source</h2>
-            <p className="mt-1 max-w-md text-sm text-muted-foreground">
-              Upload help-center articles, policies or product docs, add pages from your website, or paste an FAQ.
-            </p>
-            {canManage && (
-              <div className="mt-6">
-                <AddSourceDialog orgId={org.id} slug={org.slug} />
-              </div>
-            )}
-          </div>
+          <EmptyState
+            icon={BookOpen}
+            title="Add your first source"
+            description="Upload help-center articles, policies or product docs, add pages from your website, or paste an FAQ."
+            action={canManage && <AddSourceDialog orgId={org.id} slug={org.slug} />}
+          />
         ) : (
           <Card>
             <CardContent>

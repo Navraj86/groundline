@@ -1,4 +1,4 @@
-import { AlertTriangle, Bot, Clock, DollarSign, MessagesSquare, Users } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -10,6 +10,7 @@ import { api, ApiError } from "@/lib/api";
 import { requireOrg } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
 import { PageBody, PageHeader } from "../_components/page-header";
+import { StatStrip } from "../_components/stat-strip";
 import { DailyChart } from "./daily-chart";
 import { RangePicker } from "./range-picker";
 
@@ -74,25 +75,22 @@ export default async function AnalyticsPage({ params, searchParams }: PageProps<
 function Report({ report: r, slug }: { report: AnalyticsReport; slug: string }) {
   const c = r.conversations;
   const tiles = [
-    { label: "Conversations", value: int(c.total), hint: `${int(c.customerMessages)} customer messages`, icon: MessagesSquare },
+    { label: "Conversations", value: int(c.total), hint: `${int(c.customerMessages)} customer messages` },
     {
       label: "Resolved by AI",
       value: pct(c.resolutionRate),
       hint: `${int(c.aiResolved)} of ${int(c.aiEngaged)} the assistant answered`,
-      icon: Bot,
     },
-    { label: "Escalated", value: int(c.escalated), hint: c.total ? `${pct(c.escalated / c.total)} of conversations` : "No conversations", icon: Users },
+    { label: "Escalated", value: int(c.escalated), hint: c.total ? `${pct(c.escalated / c.total)} of conversations` : "No conversations" },
     {
       label: "Median reply time",
       value: secs(r.answers.latency.p50Ms),
       hint: `90% within ${secs(r.answers.latency.p90Ms)}`,
-      icon: Clock,
     },
     {
       label: "Estimated AI cost",
       value: usd(r.usage.estimatedCostUsd),
       hint: `${tokens(r.usage.inputTokens + r.usage.outputTokens + r.usage.qualityTokens)} tokens${r.usage.costIncomplete ? " · some models unpriced" : ""}`,
-      icon: DollarSign,
     },
   ];
   const q = r.quality;
@@ -100,20 +98,7 @@ function Report({ report: r, slug }: { report: AnalyticsReport; slug: string }) 
 
   return (
     <>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {tiles.map(({ label, value, hint, icon: Icon }) => (
-          <Card key={label} className="gap-2">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardDescription>{label}</CardDescription>
-              <Icon className="size-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-semibold tabular-nums">{value}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <StatStrip stats={tiles} />
 
       <Card>
         <CardHeader>
