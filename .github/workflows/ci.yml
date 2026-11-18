@@ -5,8 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# Pull requests get their own group: a PR run that starts after its merge reports main as its
+# ref, and sharing main's group let it cancel the push run on main.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -142,7 +144,8 @@ jobs:
           tags: ${{ steps.name.outputs.image }}:${{ github.sha }}-${{ matrix.arch }}
           labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha,scope=${{ matrix.image.name }}-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}-${{ matrix.arch }}
+          # A run that can't write the cache (a PR run after its merge) still passes on a good build.
+          cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}-${{ matrix.arch }},ignore-error=true
 
   publish:
     name: Publish multi-arch images
