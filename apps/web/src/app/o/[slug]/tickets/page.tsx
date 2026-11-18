@@ -4,7 +4,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   hasPermission,
-  TICKET_PRIORITY_LABELS,
   TICKET_STATUS_LABELS,
   TICKET_STATUSES,
   type Paginated,
@@ -18,9 +17,12 @@ import { api } from "@/lib/api";
 import { requireOrg } from "@/lib/auth";
 import { formatRelative } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { FilterTabs } from "../_components/filter-tabs";
+import { EmptyState } from "../_components/empty-state";
 import { PageBody, PageHeader } from "../_components/page-header";
-import { PRIORITY_CLASS, STATUS_VARIANT } from "./labels";
+import { STATUS_CLASS } from "./labels";
 import { NewTicketDialog } from "./new-ticket-dialog";
+import { PriorityMark } from "./priority-mark";
 
 export const metadata: Metadata = { title: "Tickets" };
 
@@ -54,39 +56,39 @@ export default async function TicketsPage({ params, searchParams }: PageProps<"/
         actions={<NewTicketDialog orgId={org.id} slug={org.slug} />}
       />
       <PageBody>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button asChild size="sm" variant={!status ? "default" : "outline"}>
-            <Link href={link({ assignee })}>All</Link>
-          </Button>
-          {TICKET_STATUSES.map((s) => (
-            <Button key={s} asChild size="sm" variant={status === s ? "default" : "outline"}>
-              <Link href={link({ status: s, assignee })}>{TICKET_STATUS_LABELS[s]}</Link>
-            </Button>
-          ))}
-          <span className="mx-1 h-5 w-px bg-border" />
-          <Button asChild size="sm" variant={assignee === "me" ? "default" : "ghost"}>
-            <Link href={link({ status, assignee: assignee === "me" ? undefined : "me" })}>Assigned to me</Link>
-          </Button>
-          <Button asChild size="sm" variant={assignee === "unassigned" ? "default" : "ghost"}>
-            <Link href={link({ status, assignee: assignee === "unassigned" ? undefined : "unassigned" })}>Unassigned</Link>
-          </Button>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <FilterTabs
+            label="Status"
+            tabs={[
+              { label: "All", href: link({ assignee }), active: !status },
+              ...TICKET_STATUSES.map((s) => ({
+                label: TICKET_STATUS_LABELS[s],
+                href: link({ status: s, assignee }),
+                active: status === s,
+              })),
+            ]}
+          />
+          <FilterTabs
+            label="Assignee"
+            tabs={[
+              { label: "Anyone", href: link({ status }), active: !assignee },
+              { label: "Assigned to me", href: link({ status, assignee: "me" }), active: assignee === "me" },
+              { label: "Unassigned", href: link({ status, assignee: "unassigned" }), active: assignee === "unassigned" },
+            ]}
+          />
         </div>
 
         {page.items.length === 0 ? (
-          <div className="flex flex-col items-center rounded-xl border border-dashed px-6 py-16 text-center">
-            <div className="mb-4 rounded-full bg-muted p-3">
-              <TicketIcon className="size-6 text-muted-foreground" />
-            </div>
-            <h2 className="text-lg font-semibold">No tickets here</h2>
-            <p className="mt-1 max-w-md text-sm text-muted-foreground">
-              When a customer asks for a person, or the assistant can&apos;t resolve something, a ticket appears here.
-            </p>
-          </div>
+          <EmptyState
+            icon={TicketIcon}
+            title="No tickets here"
+            description="When a customer asks for a person, or the assistant can't resolve something, a ticket appears here."
+          />
         ) : (
           <Card className="py-0">
             <CardContent className="divide-y px-0">
               {page.items.map((t) => (
-                <Link key={t.id} href={`${base}/${t.number}`} className="flex items-center gap-4 px-6 py-4 transition hover:bg-muted/50">
+                <Link key={t.id} href={`${base}/${t.number}`} className="flex items-center gap-4 px-6 py-4 transition-colors duration-150 hover:bg-muted/50">
                   <span className="w-14 shrink-0 font-mono text-sm text-muted-foreground">#{t.number}</span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{t.subject}</p>
@@ -96,10 +98,8 @@ export default async function TicketsPage({ params, searchParams }: PageProps<"/
                       {t.assignee ? `Assigned to ${t.assignee.fullName ?? t.assignee.email}` : "Unassigned"}
                     </p>
                   </div>
-                  <span className={cn("hidden w-16 text-xs sm:block", PRIORITY_CLASS[t.priority])}>
-                    {TICKET_PRIORITY_LABELS[t.priority]}
-                  </span>
-                  <Badge variant={STATUS_VARIANT[t.status]} className="w-24 justify-center">
+                  <PriorityMark priority={t.priority} className="hidden w-20 sm:inline-flex" />
+                  <Badge variant="outline" className={cn("w-24 justify-center", STATUS_CLASS[t.status])}>
                     {TICKET_STATUS_LABELS[t.status]}
                   </Badge>
                   <time className="hidden w-24 text-right text-xs text-muted-foreground md:block" dateTime={t.updatedAt}>

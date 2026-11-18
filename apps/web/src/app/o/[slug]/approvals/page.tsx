@@ -9,6 +9,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { api } from "@/lib/api";
 import { requireOrg } from "@/lib/auth";
 import { formatDateTime, formatRelative } from "@/lib/format";
+import { FilterTabs } from "../_components/filter-tabs";
+import { EmptyState } from "../_components/empty-state";
 import { PageBody, PageHeader } from "../_components/page-header";
 import { DecisionButtons } from "./decision-buttons";
 
@@ -42,27 +44,22 @@ export default async function ApprovalsPage({ params, searchParams }: PageProps<
         description="Refunds, cancellations and other sensitive actions the assistant prepared. Nothing runs until an owner or admin approves it."
       />
       <PageBody>
-        <div className="flex gap-2">
-          <Button asChild size="sm" variant={history ? "outline" : "default"}>
-            <Link href={base}>Pending</Link>
-          </Button>
-          <Button asChild size="sm" variant={history ? "default" : "outline"}>
-            <Link href={`${base}?view=history`}>History</Link>
-          </Button>
-        </div>
+        <FilterTabs
+          label="View"
+          tabs={[
+            { label: "Pending", href: base, active: !history },
+            { label: "History", href: `${base}?view=history`, active: Boolean(history) },
+          ]}
+        />
         {!canDecide && !history && (
           <p className="text-sm text-muted-foreground">Only owners and admins can approve or reject these.</p>
         )}
         {items.length === 0 ? (
-          <div className="flex flex-col items-center rounded-xl border border-dashed px-6 py-16 text-center">
-            <div className="mb-4 rounded-full bg-muted p-3">
-              <ShieldCheck className="size-6 text-muted-foreground" />
-            </div>
-            <h2 className="text-lg font-semibold">{history ? "No decisions yet" : "Nothing waiting for review"}</h2>
-            <p className="mt-1 max-w-md text-sm text-muted-foreground">
-              When a signed-in customer asks for a refund or cancellation, the request waits here for approval.
-            </p>
-          </div>
+          <EmptyState
+            icon={ShieldCheck}
+            title={history ? "No decisions yet" : "Nothing waiting for review"}
+            description="When a signed-in customer asks for a refund or cancellation, the request waits here for approval."
+          />
         ) : (
           <div className="space-y-3">
             {items.map((a) => (
