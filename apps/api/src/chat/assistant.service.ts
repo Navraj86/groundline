@@ -22,7 +22,7 @@ export function readAssistantSettings(settings: Prisma.JsonValue): AssistantSett
   return { ...DEFAULT_ASSISTANT_SETTINGS, ...raw };
 }
 
-/** Chat assistant configuration (FR-039) and the public widget key. */
+/** Chat assistant configuration and the public widget key. */
 @Injectable()
 export class AssistantService {
   constructor(

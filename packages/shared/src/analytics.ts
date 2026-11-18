@@ -74,7 +74,7 @@ export interface DailyPoint {
 }
 
 /**
- * Support analytics for a date range (FR-057 – FR-062). Conversation figures cover the
+ * Support analytics for a date range. Conversation figures cover the
  * website widget only; usage and cost include playground tests, which cost the same.
  */
 export interface AnalyticsReport {

@@ -31,8 +31,8 @@ export type WebhookResult = { received: true; status: 'processed' | 'ignored' | 
 
 /**
  * Handles Dodo Payments webhooks:
- * 1. verifies the Standard Webhooks signature and timestamp (BR-010),
- * 2. records the delivery by webhook-id so retries and replays are applied once (BR-011),
+ * 1. verifies the Standard Webhooks signature and timestamp,
+ * 2. records the delivery by webhook-id so retries and replays are applied once,
  * 3. applies the event and marks it processed in the same transaction.
  * A failure leaves the event FAILED and returns 5xx so the provider retries it.
  */

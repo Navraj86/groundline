@@ -17,7 +17,7 @@ const approvalInclude = {
 
 type ApprovalRow = Prisma.ApprovalRequestGetPayload<{ include: typeof approvalInclude }>;
 
-/** Human review of sensitive agent actions (workflow 7.5, FR-054). */
+/** Human review of sensitive agent actions. */
 @Injectable()
 export class ApprovalsService implements OnModuleInit {
   private readonly logger = new Logger(ApprovalsService.name);

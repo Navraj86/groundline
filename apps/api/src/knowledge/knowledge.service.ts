@@ -134,7 +134,7 @@ export class KnowledgeService {
   async remove(org: OrgContext, user: AuthContext, id: string): Promise<void> {
     const source = await this.find(org.organizationId, id);
     await this.prisma.$transaction(async (tx) => {
-      // Chunks cascade with the row, so the content is out of retrieval immediately (BR-014).
+      // Chunks cascade with the row, so the content is out of retrieval immediately.
       await tx.knowledgeSource.delete({ where: { id } });
       await this.audit.record(
         {

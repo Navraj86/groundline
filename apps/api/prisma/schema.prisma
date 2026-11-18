@@ -131,7 +131,7 @@ model Invitation {
   @@map("invitations")
 }
 
-// Append-only record of administrative and agent actions (BR-013).
+// Append-only record of administrative and agent actions.
 model AuditLog {
   id             String   @id @default(uuid(7)) @db.Uuid
   organizationId String?  @map("organization_id") @db.Uuid
@@ -247,7 +247,7 @@ model Payment {
   @@map("payments")
 }
 
-// Every verified webhook delivery, keyed by its webhook-id for idempotency (BR-011).
+// Every verified webhook delivery, keyed by its webhook-id for idempotency.
 model PaymentEvent {
   id                 String             @id @default(uuid(7)) @db.Uuid
   webhookId          String             @unique @map("webhook_id")
@@ -288,7 +288,7 @@ model UsageCounter {
 //
 // Sources are owned here. Their text chunks and embeddings live in the AI service's
 // `ai.knowledge_chunks` table (pgvector), which references knowledge_sources with
-// ON DELETE CASCADE so a deleted source can never be retrieved again (BR-014).
+// ON DELETE CASCADE so a deleted source can never be retrieved again.
 
 enum KnowledgeSourceType {
   FILE
@@ -318,7 +318,7 @@ model KnowledgeSource {
   chunkCount     Int                   @default(0) @map("chunk_count")
   characterCount Int?                  @map("character_count")
   error          String?
-  // Processing bookkeeping for the ingestion worker (BR-012).
+  // Processing bookkeeping for the ingestion worker.
   attempts       Int                   @default(0)
   lockedAt       DateTime?             @map("locked_at") @db.Timestamptz(6)
   processedAt    DateTime?             @map("processed_at") @db.Timestamptz(6)
@@ -400,7 +400,7 @@ model Message {
   content           String
   // Assistant replies only.
   answerStatus      AnswerStatus? @map("answer_status")
-  // [{ sourceId, title, snippet, score }] backing the answer (FR-035).
+  // [{ sourceId, title, snippet, score }] backing the answer.
   sources           Json          @default("[]")
   provider          String?
   model             String?
@@ -574,7 +574,7 @@ enum ToolCallStatus {
   REJECTED
 }
 
-// Every tool the agent asked to run, with input, outcome and timing (FR-053).
+// Every tool the agent asked to run, with input, outcome and timing.
 model ToolCall {
   id             String         @id @default(uuid(7)) @db.Uuid
   organizationId String         @map("organization_id") @db.Uuid
@@ -607,7 +607,7 @@ enum ApprovalStatus {
   EXPIRED
 }
 
-// A sensitive action waiting for a person to approve it (FR-054, BR-007).
+// A sensitive action waiting for a person to approve it.
 model ApprovalRequest {
   id             String         @id @default(uuid(7)) @db.Uuid
   organizationId String         @map("organization_id") @db.Uuid
@@ -662,7 +662,7 @@ model Integration {
 
 // ---- Evaluations ------------------------------------------------------------------------
 
-// A named set of test questions for checking the assistant's answers (FR-063).
+// A named set of test questions for checking the assistant's answers.
 model EvalDataset {
   id             String   @id @default(uuid(7)) @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid
@@ -709,7 +709,7 @@ enum EvalRunStatus {
   CANCELLED
 }
 
-// One run of a dataset against the assistant as configured at the time (FR-067).
+// One run of a dataset against the assistant as configured at the time.
 model EvalRun {
   id             String        @id @default(uuid(7)) @db.Uuid
   organizationId String        @map("organization_id") @db.Uuid

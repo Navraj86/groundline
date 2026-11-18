@@ -155,7 +155,7 @@ async def answer(request: AnswerRequest, settings: Settings) -> AnswerResponse:
         return AnswerResponse(status="ERROR", answer=ERROR_MESSAGE, latency_ms=elapsed())
 
     if not hits:
-        # Nothing relevant: don't spend tokens or risk a made-up answer (FR-037).
+        # Nothing relevant: don't spend tokens or risk a made-up answer.
         return AnswerResponse(
             status="INSUFFICIENT_CONTEXT",
             answer=insufficient_message(request.assistant),

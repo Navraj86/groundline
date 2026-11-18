@@ -29,9 +29,9 @@ export interface ToolSpec {
 }
 
 /**
- * The gate between the model and real actions (BR-008): only registered, enabled tools
+ * The gate between the model and real actions: only registered, enabled tools
  * run, with validated input, for the verified customer only. Sensitive tools become
- * approval requests instead of running (BR-007). Every request is logged (FR-053).
+ * approval requests instead of running. Every request is logged.
  */
 @Injectable()
 export class ToolExecutor {
