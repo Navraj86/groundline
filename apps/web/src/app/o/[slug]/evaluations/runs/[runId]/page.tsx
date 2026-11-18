@@ -124,7 +124,7 @@ function ResultRow({ result: r }: { result: EvalResultView }) {
     <li className="py-3 first:pt-0">
       <details className="group">
         <summary className="flex cursor-pointer list-none items-start gap-3">
-          <Icon className={cn("mt-0.5 size-4 shrink-0", r.passed ? "text-emerald-600" : "text-destructive")} aria-label={r.passed ? "Passed" : "Failed"} />
+          <Icon className={cn("mt-0.5 size-4 shrink-0", r.passed ? "text-signal" : "text-destructive")} aria-label={r.passed ? "Passed" : "Failed"} />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium">{r.question}</p>
             <p className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-muted-foreground">

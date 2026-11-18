@@ -90,7 +90,12 @@ export function AppSidebar({ me, org }: { me: Me; org: OrganizationSummary }) {
         const active = item.href === "" ? pathname === base : pathname.startsWith(href);
         return (
           <SidebarMenuItem key={item.title}>
-            <SidebarMenuButton asChild isActive={active} tooltip={item.title}>
+            <SidebarMenuButton
+              asChild
+              isActive={active}
+              tooltip={item.title}
+              className="relative text-sidebar-foreground/70 before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-signal before:opacity-0 before:transition-opacity before:duration-200data-[active=true]:text-sidebar-foreground data-[active=true]:before:opacity-100 group-data-[collapsible=icon]:before:hidden"
+            >
               <Link href={href}>
                 <item.icon />
                 <span>{item.title}</span>
