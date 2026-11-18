@@ -8,7 +8,7 @@ import { AnalyticsService } from './analytics.service.js';
 export class AnalyticsController {
   constructor(private readonly analytics: AnalyticsService) {}
 
-  /** Support, AI and agent metrics for an inclusive date range (FR-057 – FR-062). */
+  /** Support, AI and agent metrics for an inclusive date range. */
   @Get()
   @OrgScoped('analytics:read')
   report(@CurrentOrg() org: OrgContext, @Query({ schema: analyticsQuerySchema }) query: AnalyticsQuery): Promise<AnalyticsReport> {

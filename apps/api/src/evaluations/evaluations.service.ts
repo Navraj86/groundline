@@ -34,7 +34,7 @@ const runInclude = {
 } satisfies Prisma.EvalRunInclude;
 type RunRow = Prisma.EvalRunGetPayload<{ include: typeof runInclude }>;
 
-/** Evaluation datasets, their test cases, and runs (FR-063 – FR-067). */
+/** Evaluation datasets, their test cases, and runs. */
 @Injectable()
 export class EvaluationsService {
   constructor(

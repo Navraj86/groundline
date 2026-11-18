@@ -27,6 +27,7 @@
     "db:studio": "prisma studio",
     "db:seed": "prisma db seed",
     "billing:simulate": "tsx scripts/simulate-webhook.ts",
+    "demo:seed": "tsx scripts/seed-demo.ts",
     "billing:check": "tsx scripts/check-dodo.ts"
   },
   "dependencies": {

@@ -42,7 +42,7 @@ export function currentPeriodStart(now = new Date()): Date {
 }
 
 /**
- * Decides which plan applies to an organization and enforces its limits (BR-009).
+ * Decides which plan applies to an organization and enforces its limits.
  */
 @Injectable()
 export class EntitlementsService {

@@ -111,7 +111,7 @@ export class ChatService {
     return { message: toMessage(customerMessage, false), reply: toMessage(reply, false), status, pendingApprovals };
   }
 
-  /** Hands the conversation to the team (FR-038). Tickets attach to this in a later phase. */
+  /** Hands the conversation to the team. */
   async escalate(organizationId: string, conversationId: string, input: EscalateInput): Promise<ConversationDetail> {
     const conversation = await this.findConversation(organizationId, conversationId);
     if (conversation.status !== 'ESCALATED') {
@@ -295,7 +295,7 @@ export class ChatService {
         result = response;
         break;
       }
-      // The model only proposes; the executor decides what actually runs (BR-008).
+      // The model only proposes; the executor decides what actually runs.
       for (const call of response.tool_calls.slice(0, MAX_TOOL_CALLS_PER_STEP)) {
         const outcome = await this.toolExecutor.execute(
           { organizationId, conversationId, agentRunId: run.id },

@@ -18,7 +18,7 @@ export interface ToolInfo {
   name: AgentToolName;
   label: string;
   description: string;
-  /** Sensitive tools always wait for an owner or admin to approve (BR-007). */
+  /** Sensitive tools always wait for an owner or admin to approve. */
   sensitive: boolean;
   /** Needs a verified customer: acts only on the signed-in customer's own account. */
   requiresCustomer: boolean;

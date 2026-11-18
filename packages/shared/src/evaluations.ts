@@ -9,7 +9,7 @@ export const EVAL_PASS_SCORE = 0.6;
 export const EVAL_RUN_STATUSES = ['QUEUED', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED'] as const;
 export type EvalRunStatus = (typeof EVAL_RUN_STATUSES)[number];
 
-/** Built-in datasets an organization can start from (FR-063). */
+/** Built-in datasets an organization can start from. */
 export const EVAL_TEMPLATES = {
   guardrails: {
     name: 'Guardrails',
